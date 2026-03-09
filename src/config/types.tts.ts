@@ -66,6 +66,23 @@ export type TtsConfig = {
     /** System-level instructions for the TTS model (gpt-4o-mini-tts only). */
     instructions?: string;
   };
+  /** Typecast AI configuration. */
+  typecast?: {
+    apiKey?: SecretInput;
+    baseHost?: string;
+    voiceId?: string;
+    model?: "ssfm-v21" | "ssfm-v30";
+    language?: string;
+    emotionPreset?: "normal" | "happy" | "sad" | "angry" | "whisper" | "toneup" | "tonedown";
+    emotionIntensity?: number;
+    seed?: number;
+    output?: {
+      volume?: number;
+      audioPitch?: number;
+      audioTempo?: number;
+      audioFormat?: "wav" | "mp3";
+    };
+  };
   /** Legacy alias for Microsoft speech configuration. */
   edge?: {
     /** Explicitly allow Microsoft speech usage (no API key required). */

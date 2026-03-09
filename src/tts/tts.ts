@@ -49,6 +49,7 @@ import {
   summarizeText,
 } from "./tts-core.js";
 export { OPENAI_TTS_MODELS, OPENAI_TTS_VOICES } from "./tts-core.js";
+import * as tc from "./typecast.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_TTS_MAX_LENGTH = 1500;
@@ -75,6 +76,7 @@ const TELEGRAM_OUTPUT = {
   // ElevenLabs output formats use codec_sample_rate_bitrate naming.
   // Opus @ 48kHz/64kbps is a good voice-note tradeoff for Telegram.
   elevenlabs: "opus_48000_64",
+  typecast: "mp3" as const,
   extension: ".opus",
   voiceCompatible: true,
 };
@@ -82,6 +84,7 @@ const TELEGRAM_OUTPUT = {
 const DEFAULT_OUTPUT = {
   openai: "mp3" as const,
   elevenlabs: "mp3_44100_128",
+  typecast: "mp3" as const,
   extension: ".mp3",
   voiceCompatible: false,
 };
@@ -119,6 +122,7 @@ export type ResolvedTtsConfig = {
     speed?: number;
     instructions?: string;
   };
+  typecast: ReturnType<typeof tc.resolveTypecastDefaults>;
   edge: {
     enabled: boolean;
     voice: string;
@@ -326,6 +330,17 @@ export function resolveTtsConfig(cfg: OpenClawConfig): ResolvedTtsConfig {
       speed: raw.openai?.speed,
       instructions: raw.openai?.instructions?.trim() || undefined,
     },
+    typecast: tc.resolveTypecastDefaults(
+      raw.typecast
+        ? {
+            ...raw.typecast,
+            apiKey: normalizeResolvedSecretInputString({
+              value: raw.typecast.apiKey,
+              path: "messages.tts.typecast.apiKey",
+            }),
+          }
+        : undefined,
+    ),
     edge: {
       enabled: rawMicrosoft.enabled ?? true,
       voice: rawMicrosoft.voice?.trim() || DEFAULT_EDGE_VOICE,
@@ -478,6 +493,9 @@ export function getTtsProvider(config: ResolvedTtsConfig, prefsPath: string): Tt
   if (resolveTtsApiKey(config, "elevenlabs")) {
     return "elevenlabs";
   }
+  if (resolveTtsApiKey(config, "typecast")) {
+    return "typecast";
+  }
   return "microsoft";
 }
 
@@ -546,10 +564,13 @@ export function resolveTtsApiKey(
   if (normalizedProvider === "openai") {
     return config.openai.apiKey || process.env.OPENAI_API_KEY;
   }
+  if (provider === "typecast") {
+    return config.typecast.apiKey || process.env.TYPECAST_API_KEY;
+  }
   return undefined;
 }
 
-export const TTS_PROVIDERS = ["openai", "elevenlabs", "microsoft"] as const;
+export const TTS_PROVIDERS = ["openai", "elevenlabs", "typecast", "microsoft"] as const;
 
 export function resolveTtsProviderOrder(primary: TtsProvider, cfg?: OpenClawConfig): TtsProvider[] {
   const normalizedPrimary = normalizeSpeechProviderId(primary) ?? primary;
