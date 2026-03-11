@@ -347,8 +347,14 @@ async function runPackageInstallUpdate(params: {
 
   if (pkgRoot) {
     afterVersion = await readPackageVersion(pkgRoot);
-    const entryPath = path.join(pkgRoot, "dist", "entry.js");
-    if (await pathExists(entryPath)) {
+    let entryPath: string | undefined;
+    for (const candidate of resolveGatewayInstallEntrypointCandidates(pkgRoot)) {
+      if (await pathExists(candidate)) {
+        entryPath = candidate;
+        break;
+      }
+    }
+    if (entryPath) {
       const doctorStep = await runUpdateStep({
         name: `${CLI_NAME} doctor`,
         argv: [resolveNodeRunner(), entryPath, "doctor", "--non-interactive"],
