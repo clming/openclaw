@@ -516,7 +516,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
           replyOptions: {
             ...replyOptions,
             disableBlockStreaming:
-              typeof account.blockStreaming === "boolean" ? !account.blockStreaming : false,
+              typeof account.blockStreaming === "boolean" ? !account.blockStreaming : undefined,
             onModelSelected,
           },
         });
@@ -729,7 +729,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
           replyOptions: {
             ...replyOptions,
             disableBlockStreaming:
-              typeof account.blockStreaming === "boolean" ? !account.blockStreaming : false,
+              typeof account.blockStreaming === "boolean" ? !account.blockStreaming : undefined,
             onModelSelected,
           },
         }),
