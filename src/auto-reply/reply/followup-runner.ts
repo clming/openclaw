@@ -43,8 +43,7 @@ import type { TypingController } from "./typing.js";
 
 const MEDIA_ONLY_PLACEHOLDER = "[User sent media without caption]";
 const MEDIA_REPLY_HINT_PREFIX = "To send an image back, prefer the message tool";
-const LEADING_MEDIA_ATTACHED_LINE_RE =
-  /^(?:\[media attached: \d+ files\]|\[media attached(?: \d+\/\d+)?: [^\r\n]*\])$/;
+const LEADING_MEDIA_ATTACHED_LINE_RE = /^\[media attached(?: \d+\/\d+)?: [^\r\n]*\]$/;
 const FILE_BLOCK_RE = /<file\s+name="/i;
 
 function stripLeadingMediaAttachedLines(prompt: string): string {
@@ -87,6 +86,28 @@ function stripInlineDirectives(text: string | undefined): string {
   return parseInlineDirectives(text ?? "").cleaned.trim();
 }
 
+function normalizeUpdatedBody(params: { originalBody?: string; updatedBody?: string }): string {
+  const updatedBody = params.updatedBody?.trim();
+  if (!updatedBody) {
+    return "";
+  }
+  const originalBody = params.originalBody?.trim();
+  if (!originalBody) {
+    return updatedBody;
+  }
+
+  const cleanedOriginalBody = stripInlineDirectives(originalBody);
+  if (!cleanedOriginalBody) {
+    return updatedBody;
+  }
+  if (updatedBody === originalBody) {
+    return cleanedOriginalBody;
+  }
+  return (
+    replaceLastOccurrence(updatedBody, originalBody, cleanedOriginalBody) ?? updatedBody
+  ).trim();
+}
+
 function rebuildQueuedPromptWithMediaUnderstanding(params: {
   prompt: string;
   originalBody?: string;
@@ -98,7 +119,10 @@ function rebuildQueuedPromptWithMediaUnderstanding(params: {
     stripped = stripLeadingMediaReplyHint(stripped);
   }
 
-  const updatedBody = stripInlineDirectives(params.updatedBody);
+  const updatedBody = normalizeUpdatedBody({
+    originalBody: params.originalBody,
+    updatedBody: params.updatedBody,
+  });
   if (!updatedBody) {
     return [params.mediaNote?.trim(), stripped].filter(Boolean).join("\n").trim();
   }
@@ -249,8 +273,11 @@ export function createFollowupRunner(params: {
       if (queued.mediaContext && !queued.mediaContext.MediaUnderstanding?.length) {
         const hasMedia = Boolean(
           queued.mediaContext.MediaPath?.trim() ||
+          queued.mediaContext.MediaUrl?.trim() ||
           (Array.isArray(queued.mediaContext.MediaPaths) &&
-            queued.mediaContext.MediaPaths.length > 0),
+            queued.mediaContext.MediaPaths.length > 0) ||
+          (Array.isArray(queued.mediaContext.MediaUrls) &&
+            queued.mediaContext.MediaUrls.length > 0),
         );
         if (hasMedia) {
           try {
@@ -280,6 +307,9 @@ export function createFollowupRunner(params: {
             });
             const shouldRebuildPrompt =
               muResult.outputs.length > 0 ||
+              muResult.appliedAudio ||
+              muResult.appliedImage ||
+              muResult.appliedVideo ||
               (muResult.appliedFile && !bodyAlreadyHasFileBlock);
             if (shouldRebuildPrompt) {
               // Rebuild the queued prompt from the mutated media context so the
