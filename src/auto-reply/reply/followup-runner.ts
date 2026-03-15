@@ -13,16 +13,15 @@ import type { SessionEntry } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
-import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
 import { defaultRuntime } from "../../runtime.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
-import { buildInboundMediaNote } from "../media-note.js";
-import type { MsgContext, OriginatingChannelType } from "../templating.js";
+import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { resolveRunAuthProfile } from "./agent-runner-utils.js";
 import { parseInlineDirectives } from "./directive-handling.js";
+import { applyDeferredMediaUnderstandingToQueuedRun } from "./followup-media.js";
 import {
   resolveOriginAccountId,
   resolveOriginMessageProvider,
@@ -266,72 +265,7 @@ export function createFollowupRunner(params: {
       let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
         activeSessionEntry?.systemPromptReport,
       );
-
-      // Apply media understanding for followup-queued messages when it was
-      // not applied (or failed) in the primary path.  This ensures voice
-      // notes that arrived while the agent was mid-turn still get transcribed.
-      if (queued.mediaContext && !queued.mediaContext.MediaUnderstanding?.length) {
-        const hasMedia = Boolean(
-          queued.mediaContext.MediaPath?.trim() ||
-          queued.mediaContext.MediaUrl?.trim() ||
-          (Array.isArray(queued.mediaContext.MediaPaths) &&
-            queued.mediaContext.MediaPaths.length > 0) ||
-          (Array.isArray(queued.mediaContext.MediaUrls) &&
-            queued.mediaContext.MediaUrls.length > 0),
-        );
-        if (hasMedia) {
-          try {
-            const resolvedOriginalBody =
-              queued.mediaContext.CommandBody ??
-              queued.mediaContext.RawBody ??
-              queued.mediaContext.Body;
-            const mediaCtx = {
-              ...queued.mediaContext,
-              Body: resolvedOriginalBody,
-            } as MsgContext;
-            const originalBody = resolvedOriginalBody;
-            // Capture whether the resolved body already contains a file block
-            // BEFORE applyMediaUnderstanding mutates it — this detects prior
-            // extraction so we avoid double-inserting.  Checking the body
-            // (not the full queued.prompt) avoids false positives from user
-            // messages that happen to contain literal "<file path=" text.
-            const bodyAlreadyHasFileBlock = FILE_BLOCK_RE.test(resolvedOriginalBody ?? "");
-            const muResult = await applyMediaUnderstanding({
-              ctx: mediaCtx,
-              cfg: queued.run.config,
-              agentDir: queued.run.agentDir,
-              activeModel: {
-                provider: queued.run.provider,
-                model: queued.run.model,
-              },
-            });
-            const shouldRebuildPrompt =
-              muResult.outputs.length > 0 ||
-              muResult.appliedAudio ||
-              muResult.appliedImage ||
-              muResult.appliedVideo ||
-              (muResult.appliedFile && !bodyAlreadyHasFileBlock);
-            if (shouldRebuildPrompt) {
-              // Rebuild the queued prompt from the mutated media context so the
-              // deferred path matches the primary path's prompt shape.
-              const newMediaNote = buildInboundMediaNote(mediaCtx);
-              queued.prompt = rebuildQueuedPromptWithMediaUnderstanding({
-                prompt: queued.prompt,
-                originalBody,
-                updatedBody: mediaCtx.Body,
-                mediaNote: newMediaNote,
-              });
-              logVerbose(
-                `followup: applied media understanding (audio=${muResult.appliedAudio}, image=${muResult.appliedImage}, video=${muResult.appliedVideo}, file=${muResult.appliedFile})`,
-              );
-            }
-          } catch (err) {
-            logVerbose(
-              `followup: media understanding failed, proceeding with raw content: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
-        }
-      }
+      await applyDeferredMediaUnderstandingToQueuedRun(queued, { logLabel: "followup" });
 
       try {
         const fallbackResult = await runWithModelFallback({
