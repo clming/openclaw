@@ -83,9 +83,12 @@ function clearFollowupQueueSummaryState(queue: FollowupQueueState): void {
 }
 
 export async function applyDeferredMediaToQueuedRuns(items: FollowupRun[]): Promise<void> {
-  for (const item of items) {
-    await applyDeferredMediaUnderstandingToQueuedRun(item, { logLabel: "followup queue" });
-  }
+  await Promise.allSettled(
+    items.map(
+      async (item) =>
+        await applyDeferredMediaUnderstandingToQueuedRun(item, { logLabel: "followup queue" }),
+    ),
+  );
 }
 
 async function resolveSummaryLines(items: FollowupRun[]): Promise<string[]> {

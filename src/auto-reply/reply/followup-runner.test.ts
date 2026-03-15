@@ -2390,6 +2390,114 @@ describe("createFollowupRunner media understanding", () => {
     };
     expect(agentCall?.prompt?.match(/<file\s+name="report\.pdf"/g)).toHaveLength(1);
   });
+
+  it("does not re-apply file extraction when RawBody is missing but Body already has a matching file block", async () => {
+    const fileBlock = '<file name="report.pdf" mime="application/pdf">\nreport content\n</file>';
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "processed" }],
+      meta: {},
+    });
+
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: vi.fn(async () => {}) },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude-opus-4-5",
+    });
+
+    await runner(
+      createQueuedRun({
+        prompt: `[media attached: /tmp/report.pdf]\n${MEDIA_REPLY_HINT}\nsummarize this\n\n${fileBlock}`,
+        mediaContext: {
+          Body: `summarize this\n\n${fileBlock}`,
+          CommandBody: "summarize this",
+          MediaPaths: ["/tmp/report.pdf"],
+          MediaTypes: ["application/pdf"],
+        },
+      }),
+    );
+
+    expect(applyMediaUnderstandingMock).not.toHaveBeenCalled();
+    const agentCall = runEmbeddedPiAgentMock.mock.calls.at(-1)?.[0] as {
+      prompt?: string;
+    };
+    expect(agentCall?.prompt).toContain(fileBlock);
+  });
+
+  it("replaces the trailing repeated body segment instead of the first matching thread text", async () => {
+    const existingFileBlock =
+      '<file name="report.pdf" mime="application/pdf">\nold extracted content\n</file>';
+    const newFileBlock =
+      '<file name="report.pdf" mime="application/pdf">\nnew extracted content\n</file>';
+    const transcriptText = "Deferred transcript";
+
+    applyMediaUnderstandingMock.mockImplementationOnce(
+      async (params: { ctx: Record<string, unknown> }) => {
+        params.ctx.MediaUnderstanding = [
+          {
+            kind: "audio.transcription",
+            text: transcriptText,
+            attachmentIndex: 0,
+            provider: "whisper",
+          },
+        ];
+        params.ctx.Transcript = transcriptText;
+        params.ctx.Body = `[Audio]\nTranscript:\n${transcriptText}\n\nsummarize this\n\n${newFileBlock}`;
+        return {
+          outputs: [
+            {
+              kind: "audio.transcription",
+              text: transcriptText,
+              attachmentIndex: 0,
+              provider: "whisper",
+            },
+          ],
+          decisions: [],
+          appliedImage: false,
+          appliedAudio: true,
+          appliedVideo: false,
+          appliedFile: true,
+        };
+      },
+    );
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "processed" }],
+      meta: {},
+    });
+
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: vi.fn(async () => {}) },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude-opus-4-5",
+    });
+
+    await runner(
+      createQueuedRun({
+        prompt:
+          `[media attached 1/2: /tmp/voice.ogg]\n[media attached 2/2: /tmp/report.pdf]\n${MEDIA_REPLY_HINT}\nThread history: summarize this\n\n` +
+          `summarize this\n\n${existingFileBlock}`,
+        mediaContext: {
+          Body: `summarize this\n\n${existingFileBlock}`,
+          CommandBody: "summarize this",
+          RawBody: "summarize this",
+          MediaPaths: ["/tmp/voice.ogg", "/tmp/report.pdf"],
+          MediaTypes: ["audio/ogg", "application/pdf"],
+        },
+      }),
+    );
+
+    const agentCall = runEmbeddedPiAgentMock.mock.calls.at(-1)?.[0] as {
+      prompt?: string;
+    };
+    expect(agentCall?.prompt).toContain("Thread history: summarize this");
+    expect(agentCall?.prompt).toContain(transcriptText);
+    expect(agentCall?.prompt).toContain(newFileBlock);
+    expect(agentCall?.prompt).not.toContain("old extracted content");
+    expect(agentCall?.prompt?.indexOf(newFileBlock)).toBeGreaterThan(
+      agentCall?.prompt?.lastIndexOf("summarize this") ?? -1,
+    );
+  });
 });
 
 describe("followup queue drain deferred media understanding", () => {
@@ -2456,6 +2564,56 @@ describe("followup queue drain deferred media understanding", () => {
     expect(prompt).toContain("collect transcript");
     expect(prompt).toContain("Queued #2\nsecond text");
     expect(prompt).not.toContain("[media attached: /tmp/voice.ogg");
+  });
+
+  it("preprocesses queued runs in parallel", async () => {
+    const resolvers: Array<() => void> = [];
+    const done = () => ({
+      outputs: [],
+      decisions: [],
+      appliedImage: false,
+      appliedAudio: false,
+      appliedVideo: false,
+      appliedFile: false,
+    });
+    applyMediaUnderstandingMock.mockImplementation(
+      async () =>
+        await new Promise((resolve) => {
+          resolvers.push(() => resolve(done()));
+        }),
+    );
+
+    const items: FollowupRun[] = [
+      createQueuedRun({
+        prompt: "[media attached: /tmp/voice-1.ogg (audio/ogg)]\nfirst text",
+        summaryLine: "first text",
+        run: { messageProvider: "telegram" },
+        mediaContext: {
+          Body: "first text",
+          MediaPaths: ["/tmp/voice-1.ogg"],
+          MediaTypes: ["audio/ogg"],
+        },
+      }),
+      createQueuedRun({
+        prompt: "[media attached: /tmp/voice-2.ogg (audio/ogg)]\nsecond text",
+        summaryLine: "second text",
+        run: { messageProvider: "telegram" },
+        mediaContext: {
+          Body: "second text",
+          MediaPaths: ["/tmp/voice-2.ogg"],
+          MediaTypes: ["audio/ogg"],
+        },
+      }),
+    ];
+
+    const pending = applyDeferredMediaToQueuedRuns(items);
+
+    expect(applyMediaUnderstandingMock).toHaveBeenCalledTimes(2);
+
+    for (const resolve of resolvers) {
+      resolve();
+    }
+    await pending;
   });
 
   it("preprocesses dropped media items before building overflow summaries", async () => {

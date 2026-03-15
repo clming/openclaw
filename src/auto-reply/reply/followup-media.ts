@@ -1,3 +1,4 @@
+import path from "node:path";
 import { logVerbose } from "../../globals.js";
 import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
 import {
@@ -40,30 +41,6 @@ function stripLeadingMediaReplyHint(prompt: string): string {
   return prompt.trim();
 }
 
-function replaceLastOccurrence(
-  value: string,
-  search: string,
-  replacement: string,
-): string | undefined {
-  if (!search) {
-    return undefined;
-  }
-  const index = value.lastIndexOf(search);
-  if (index < 0) {
-    return undefined;
-  }
-  return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
-}
-
-function findFirstOccurrenceBeforeFileBlocks(value: string, search: string): number {
-  if (!search) {
-    return -1;
-  }
-  const fileBlockIndex = value.search(FILE_BLOCK_RE);
-  const bodyRegion = fileBlockIndex >= 0 ? value.slice(0, fileBlockIndex) : value;
-  return bodyRegion.indexOf(search);
-}
-
 function findLastOccurrenceBeforeFileBlocks(value: string, search: string): number {
   if (!search) {
     return -1;
@@ -98,19 +75,79 @@ function replaceLastOccurrenceBeforeFileBlocks(
   return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
 }
 
-function replaceFirstOccurrenceBeforeFileBlocks(
+function findTrailingReplacementTargetBeforeFileBlocks(
+  value: string,
+  targets: string[],
+): { index: number; target: string } | undefined {
+  let bestMatch: { index: number; target: string } | undefined;
+  for (const target of targets) {
+    const index = findLastOccurrenceBeforeFileBlocks(value, target);
+    if (index < 0) {
+      continue;
+    }
+    if (!bestMatch || index > bestMatch.index) {
+      bestMatch = { index, target };
+    }
+  }
+  return bestMatch;
+}
+
+function replaceOccurrenceAtIndex(
   value: string,
   search: string,
   replacement: string,
-): string | undefined {
-  if (!search) {
-    return undefined;
-  }
-  const index = findFirstOccurrenceBeforeFileBlocks(value, search);
-  if (index < 0) {
-    return undefined;
-  }
+  index: number,
+): string {
   return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
+}
+
+function decodeXmlAttr(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function extractAttachmentFileName(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)) {
+    try {
+      const pathname = new URL(trimmed).pathname;
+      const basename = path.posix.basename(pathname);
+      return basename || undefined;
+    } catch {
+      // Fall back to path-style parsing below.
+    }
+  }
+  const normalized = trimmed.replace(/\\/g, "/");
+  const basename = path.posix.basename(normalized);
+  return basename || undefined;
+}
+
+function bodyContainsMatchingFileBlock(mediaContext: FollowupMediaContext): boolean {
+  const body = mediaContext.Body?.trim();
+  if (!body || !FILE_BLOCK_RE.test(body)) {
+    return false;
+  }
+  const bodyFileNames = new Set<string>();
+  for (const match of body.matchAll(/<file\s+name="([^"]*)"[^>]*>/gi)) {
+    const fileName = match[1]?.trim();
+    if (fileName) {
+      bodyFileNames.add(decodeXmlAttr(fileName));
+    }
+  }
+  if (bodyFileNames.size === 0) {
+    return false;
+  }
+  return normalizeAttachments(mediaContext as MsgContext).some((attachment) => {
+    const fileName = extractAttachmentFileName(attachment.path ?? attachment.url);
+    return Boolean(fileName && bodyFileNames.has(fileName));
+  });
 }
 
 function stripInlineDirectives(text: string | undefined): string {
@@ -168,12 +205,14 @@ function rebuildQueuedPromptWithMediaUnderstanding(params: {
   // thread history above the body, and prompts whose original body no longer
   // appears all retain any legitimate <file> blocks.
   if (params.updatedBody && FILE_BLOCK_RE.test(params.updatedBody)) {
-    const bodyIdx =
-      replacementTargets
-        .map((target) => findFirstOccurrenceBeforeFileBlocks(stripped, target))
-        .find((index) => index >= 0) ?? -1;
-    if (bodyIdx >= 0) {
-      stripped = stripped.slice(0, bodyIdx) + stripExistingFileBlocks(stripped.slice(bodyIdx));
+    const trailingMatch = findTrailingReplacementTargetBeforeFileBlocks(
+      stripped,
+      replacementTargets,
+    );
+    if (trailingMatch) {
+      stripped =
+        stripped.slice(0, trailingMatch.index) +
+        stripExistingFileBlocks(stripped.slice(trailingMatch.index));
     }
   }
 
@@ -186,12 +225,15 @@ function rebuildQueuedPromptWithMediaUnderstanding(params: {
   }
 
   let rebuilt = stripped;
-  for (const target of replacementTargets) {
-    const replaced = replaceFirstOccurrenceBeforeFileBlocks(rebuilt, target, updatedBody);
-    if (replaced !== undefined) {
-      rebuilt = replaced;
-      return [params.mediaNote?.trim(), rebuilt.trim()].filter(Boolean).join("\n").trim();
-    }
+  const trailingMatch = findTrailingReplacementTargetBeforeFileBlocks(rebuilt, replacementTargets);
+  if (trailingMatch) {
+    rebuilt = replaceOccurrenceAtIndex(
+      rebuilt,
+      trailingMatch.target,
+      updatedBody,
+      trailingMatch.index,
+    );
+    return [params.mediaNote?.trim(), rebuilt.trim()].filter(Boolean).join("\n").trim();
   }
 
   rebuilt = [rebuilt, updatedBody].filter(Boolean).join("\n\n");
@@ -268,35 +310,38 @@ export async function applyDeferredMediaUnderstandingToQueuedRun(
   if (!mediaContext || mediaContext.DeferredMediaApplied) {
     return;
   }
-  if (mediaContext.MediaUnderstanding?.length) {
-    mediaContext.DeferredMediaApplied = true;
-    return;
-  }
   if (!hasMediaAttachments(mediaContext)) {
     mediaContext.DeferredMediaApplied = true;
     return;
   }
-
-  const resolvedOriginalBody =
-    mediaContext.CommandBody ?? mediaContext.RawBody ?? mediaContext.Body;
-  // Detect file extraction from the primary path via body mutation instead of
-  // scanning for literal '<file name=' patterns (which false-positives on user
-  // text).  Compare Body against RawBody (never mutated by the primary path's
-  // media/file processing) rather than CommandBody (which differs from Body
-  // when inline directives like /think were stripped).
   const referenceBody = mediaContext.RawBody ?? mediaContext.Body;
-  if (
-    !mediaContext.DeferredFileBlocksExtracted &&
-    mediaContext.Body !== referenceBody &&
-    hasAnyFileAttachments(mediaContext)
-  ) {
-    mediaContext.DeferredFileBlocksExtracted = true;
+  // Prefer RawBody-vs-Body comparison when RawBody exists. If RawBody is
+  // missing, fall back to explicit file-extraction signals instead of
+  // re-running extraction just because the clean pre-extraction body is gone.
+  if (!mediaContext.DeferredFileBlocksExtracted && hasAnyFileAttachments(mediaContext)) {
+    const rawBodyMissing = typeof mediaContext.RawBody !== "string";
+    if (mediaContext.Body !== referenceBody) {
+      mediaContext.DeferredFileBlocksExtracted = true;
+    } else if (
+      rawBodyMissing &&
+      (Boolean(mediaContext.MediaUnderstanding?.length) ||
+        bodyContainsMatchingFileBlock(mediaContext))
+    ) {
+      mediaContext.DeferredFileBlocksExtracted = true;
+    }
+  }
+  if (mediaContext.MediaUnderstanding?.length) {
+    mediaContext.DeferredMediaApplied = true;
+    return;
   }
 
   if (mediaContext.DeferredFileBlocksExtracted && hasOnlyFileLikeAttachments(mediaContext)) {
     mediaContext.DeferredMediaApplied = true;
     return;
   }
+
+  const resolvedOriginalBody =
+    mediaContext.CommandBody ?? mediaContext.RawBody ?? mediaContext.Body;
 
   try {
     const mediaCtx = {
