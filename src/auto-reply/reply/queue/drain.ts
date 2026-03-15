@@ -92,14 +92,19 @@ export async function applyDeferredMediaToQueuedRuns(items: FollowupRun[]): Prom
 }
 
 async function resolveSummaryLines(items: FollowupRun[]): Promise<string[]> {
-  const summaryLines: string[] = [];
-  for (const item of items) {
-    await applyDeferredMediaUnderstandingToQueuedRun(item, { logLabel: "followup queue" });
-    // After deferred media, prefer the updated prompt (which includes transcripts)
-    // over the original summaryLine (which may just be the caption text).
-    summaryLines.push(buildQueueSummaryLine(item.prompt.trim() || item.summaryLine?.trim() || ""));
-  }
-  return summaryLines;
+  // Parallelize the media understanding API calls upfront (same pattern as
+  // applyDeferredMediaToQueuedRuns), then build summary lines sequentially
+  // so line order matches the original item order.
+  await Promise.allSettled(
+    items.map((item) =>
+      applyDeferredMediaUnderstandingToQueuedRun(item, { logLabel: "followup queue" }),
+    ),
+  );
+  // After deferred media, prefer the updated prompt (which includes transcripts)
+  // over the original summaryLine (which may just be the caption text).
+  return items.map((item) =>
+    buildQueueSummaryLine(item.prompt.trim() || item.summaryLine?.trim() || ""),
+  );
 }
 
 export async function buildMediaAwareQueueSummaryPrompt(params: {

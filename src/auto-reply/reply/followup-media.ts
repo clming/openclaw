@@ -41,26 +41,48 @@ function stripLeadingMediaReplyHint(prompt: string): string {
   return prompt.trim();
 }
 
-function findLastOccurrenceBeforeFileBlocks(value: string, search: string): number {
+/** Collect the [start, end) ranges of every `<file …>…</file>` block in `value`. */
+function collectFileBlockRanges(value: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const re = new RegExp(FILE_BLOCK_FULL_RE.source, FILE_BLOCK_FULL_RE.flags);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+  return ranges;
+}
+
+function isInsideFileBlock(
+  position: number,
+  length: number,
+  ranges: Array<[number, number]>,
+): boolean {
+  for (const [start, end] of ranges) {
+    if (position >= start && position + length <= end) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Find the last occurrence of `search` in `value` that is NOT inside a
+ * `<file …>…</file>` block.  Searches the full string with lastIndexOf,
+ * then walks backward past any matches that fall inside file blocks.
+ */
+function findLastOccurrenceOutsideFileBlocks(value: string, search: string): number {
   if (!search) {
     return -1;
   }
-  const fileBlockIndex = value.search(FILE_BLOCK_RE);
-  const bodyRegion = fileBlockIndex >= 0 ? value.slice(0, fileBlockIndex) : value;
-  const index = bodyRegion.lastIndexOf(search);
-  if (index >= 0) {
-    return index;
+  const ranges = collectFileBlockRanges(value);
+  let pos = value.lastIndexOf(search);
+  while (pos >= 0 && isInsideFileBlock(pos, search.length, ranges)) {
+    pos = value.lastIndexOf(search, pos - 1);
   }
-  // Fallback: search string itself contains file blocks — it can't appear in the
-  // body-only region.  Search the full value with lastIndexOf to pick the trailing
-  // (most recent) occurrence when thread/history has identical <file> bodies.
-  if (FILE_BLOCK_RE.test(search)) {
-    return value.lastIndexOf(search);
-  }
-  return -1;
+  return pos;
 }
 
-function replaceLastOccurrenceBeforeFileBlocks(
+function replaceLastOccurrenceOutsideFileBlocks(
   value: string,
   search: string,
   replacement: string,
@@ -68,7 +90,7 @@ function replaceLastOccurrenceBeforeFileBlocks(
   if (!search) {
     return undefined;
   }
-  const index = findLastOccurrenceBeforeFileBlocks(value, search);
+  const index = findLastOccurrenceOutsideFileBlocks(value, search);
   if (index < 0) {
     return undefined;
   }
@@ -81,7 +103,7 @@ function findTrailingReplacementTargetBeforeFileBlocks(
 ): { index: number; target: string } | undefined {
   let bestMatch: { index: number; target: string } | undefined;
   for (const target of targets) {
-    const index = findLastOccurrenceBeforeFileBlocks(value, target);
+    const index = findLastOccurrenceOutsideFileBlocks(value, target);
     if (index < 0) {
       continue;
     }
@@ -172,7 +194,7 @@ function normalizeUpdatedBody(params: { originalBody?: string; updatedBody?: str
     return cleanedOriginalBody;
   }
   return (
-    replaceLastOccurrenceBeforeFileBlocks(updatedBody, originalBody, cleanedOriginalBody) ??
+    replaceLastOccurrenceOutsideFileBlocks(updatedBody, originalBody, cleanedOriginalBody) ??
     updatedBody
   ).trim();
 }
@@ -294,7 +316,7 @@ function snapshotUpdatedMediaContext(params: {
 
 // Exported for unit testing — these are pure string helpers with no side effects.
 export {
-  findLastOccurrenceBeforeFileBlocks as _findLastOccurrenceBeforeFileBlocks,
+  findLastOccurrenceOutsideFileBlocks as _findLastOccurrenceOutsideFileBlocks,
   normalizeUpdatedBody as _normalizeUpdatedBody,
   rebuildQueuedPromptWithMediaUnderstanding as _rebuildQueuedPromptWithMediaUnderstanding,
 };

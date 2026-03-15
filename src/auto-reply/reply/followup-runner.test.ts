@@ -2320,6 +2320,78 @@ describe("createFollowupRunner media understanding", () => {
     );
   });
 
+  it("finds the body after thread-history file blocks when body appears after the first <file> tag", async () => {
+    const threadFileBlock =
+      '<file name="thread.pdf" mime="application/pdf">\nolder thread attachment\n</file>';
+    const transcriptText = "Transcript from deferred voice note";
+
+    applyMediaUnderstandingMock.mockImplementationOnce(
+      async (params: { ctx: Record<string, unknown> }) => {
+        params.ctx.MediaUnderstanding = [
+          {
+            kind: "audio.transcription",
+            text: transcriptText,
+            attachmentIndex: 0,
+            provider: "whisper",
+          },
+        ];
+        params.ctx.Transcript = transcriptText;
+        params.ctx.Body = `[Audio]\nTranscript:\n${transcriptText}\n\ncheck this out`;
+        return {
+          outputs: [
+            {
+              kind: "audio.transcription",
+              text: transcriptText,
+              attachmentIndex: 0,
+              provider: "whisper",
+            },
+          ],
+          decisions: [],
+          appliedImage: false,
+          appliedAudio: true,
+          appliedVideo: false,
+          appliedFile: false,
+        };
+      },
+    );
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "processed" }],
+      meta: {},
+    });
+
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: vi.fn(async () => {}) },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude-opus-4-5",
+    });
+
+    // The prompt has thread history with a file block BEFORE the current
+    // queued body text.  The old truncation approach would miss the body
+    // because it only searched before the first <file> tag.
+    await runner(
+      createQueuedRun({
+        prompt: `[media attached: /tmp/voice.ogg]\n${MEDIA_REPLY_HINT}\nThread history\n\n${threadFileBlock}\n\ncheck this out`,
+        mediaContext: {
+          Body: "check this out",
+          RawBody: "check this out",
+          MediaPaths: ["/tmp/voice.ogg"],
+          MediaTypes: ["audio/ogg"],
+        },
+      }),
+    );
+
+    const agentCall = runEmbeddedPiAgentMock.mock.calls.at(-1)?.[0] as {
+      prompt?: string;
+    };
+    const transcriptBlock = `[Audio]\nTranscript:\n${transcriptText}\n\ncheck this out`;
+    // The body should be replaced with the transcript block
+    expect(agentCall?.prompt).toContain(transcriptBlock);
+    // Thread history and its file block should be preserved
+    expect(agentCall?.prompt).toContain("Thread history");
+    expect(agentCall?.prompt).toContain(threadFileBlock);
+  });
+
   it("sets DeferredMediaApplied when media understanding throws", async () => {
     applyMediaUnderstandingMock.mockRejectedValueOnce(
       new Error("transcription service unavailable"),

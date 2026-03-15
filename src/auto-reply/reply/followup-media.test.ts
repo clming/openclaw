@@ -1,43 +1,57 @@
 import { describe, expect, it } from "vitest";
 import {
-  _findLastOccurrenceBeforeFileBlocks as findLastOccurrenceBeforeFileBlocks,
+  _findLastOccurrenceOutsideFileBlocks as findLastOccurrenceOutsideFileBlocks,
   _normalizeUpdatedBody as normalizeUpdatedBody,
   _rebuildQueuedPromptWithMediaUnderstanding as rebuildQueuedPromptWithMediaUnderstanding,
 } from "./followup-media.js";
 
 const FILE_BLOCK = '<file name="doc.pdf" type="application/pdf">\nPDF content\n</file>';
 
-describe("findLastOccurrenceBeforeFileBlocks", () => {
+describe("findLastOccurrenceOutsideFileBlocks", () => {
   it("returns -1 for empty search", () => {
-    expect(findLastOccurrenceBeforeFileBlocks("hello", "")).toBe(-1);
+    expect(findLastOccurrenceOutsideFileBlocks("hello", "")).toBe(-1);
   });
 
   it("finds last occurrence in body region before file blocks", () => {
     const value = `hello world hello\n${FILE_BLOCK}`;
     // "hello" appears at 0 and 12 — both before the file block
-    expect(findLastOccurrenceBeforeFileBlocks(value, "hello")).toBe(12);
+    expect(findLastOccurrenceOutsideFileBlocks(value, "hello")).toBe(12);
   });
 
-  it("does not match inside file block content", () => {
+  it("skips matches inside file block content", () => {
+    // "PDF content" appears only inside the file block — no valid match outside.
+    const value = `some text\n${FILE_BLOCK}`;
+    expect(findLastOccurrenceOutsideFileBlocks(value, "PDF content")).toBe(-1);
+  });
+
+  it("finds trailing occurrence outside file block even when also inside one", () => {
     const value = `some text\n${FILE_BLOCK}\nPDF content`;
-    // "PDF content" appears in the file block and after it, but the body region
-    // (before <file) is just "some text\n" — no match there.
-    expect(findLastOccurrenceBeforeFileBlocks(value, "PDF content")).toBe(-1);
+    // "PDF content" appears inside the file block AND after it — the function
+    // should return the trailing occurrence that is outside the block.
+    const expected = value.lastIndexOf("PDF content");
+    expect(findLastOccurrenceOutsideFileBlocks(value, "PDF content")).toBe(expected);
   });
 
-  it("uses lastIndexOf in fallback when search itself contains file blocks", () => {
-    // When the search string contains a <file> block, it can't appear in the
-    // body-only region, so the fallback searches the full value.
+  it("finds occurrence when search itself contains file blocks", () => {
     const bodyWithFile = `caption\n${FILE_BLOCK}`;
     const value = `previous\n${bodyWithFile}\nlater\n${bodyWithFile}`;
     // Should find the *last* (trailing) occurrence
     const expected = value.lastIndexOf(bodyWithFile);
-    expect(findLastOccurrenceBeforeFileBlocks(value, bodyWithFile)).toBe(expected);
+    expect(findLastOccurrenceOutsideFileBlocks(value, bodyWithFile)).toBe(expected);
     expect(expected).toBeGreaterThan(value.indexOf(bodyWithFile));
   });
 
   it("returns index when no file blocks exist in value", () => {
-    expect(findLastOccurrenceBeforeFileBlocks("abc abc", "abc")).toBe(4);
+    expect(findLastOccurrenceOutsideFileBlocks("abc abc", "abc")).toBe(4);
+  });
+
+  it("finds body text after thread-history file blocks", () => {
+    const value = `Thread history\n${FILE_BLOCK}\n\ncheck this out`;
+    // The body "check this out" appears after a file block from thread history.
+    // The old truncation approach would miss this; the new approach finds it.
+    expect(findLastOccurrenceOutsideFileBlocks(value, "check this out")).toBe(
+      value.lastIndexOf("check this out"),
+    );
   });
 });
 
