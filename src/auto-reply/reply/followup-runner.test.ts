@@ -2496,6 +2496,41 @@ describe("createFollowupRunner media understanding", () => {
     expect(agentCall?.prompt).toContain(fileBlock);
   });
 
+  it("treats any stored file block as already extracted even when the filename differs from the attachment basename", async () => {
+    const fileBlock =
+      '<file name="statement-from-mail.pdf" mime="application/pdf">\nreport content\n</file>';
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "processed" }],
+      meta: {},
+    });
+
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: vi.fn(async () => {}) },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude-opus-4-5",
+    });
+
+    const queued = createQueuedRun({
+      prompt: `[media attached: /tmp/upload-8472.bin]\n${MEDIA_REPLY_HINT}\nsummarize this\n\n${fileBlock}`,
+      mediaContext: {
+        Body: `summarize this\n\n${fileBlock}`,
+        CommandBody: "summarize this",
+        MediaPaths: ["/tmp/upload-8472.bin"],
+        MediaTypes: ["application/pdf"],
+      },
+    });
+
+    await runner(queued);
+
+    expect(applyMediaUnderstandingMock).not.toHaveBeenCalled();
+    expect(queued.mediaContext?.DeferredFileBlocksExtracted).toBe(true);
+    const agentCall = runEmbeddedPiAgentMock.mock.calls.at(-1)?.[0] as {
+      prompt?: string;
+    };
+    expect(agentCall?.prompt?.match(/<file\s+name="statement-from-mail\.pdf"/g)).toHaveLength(1);
+  });
+
   it("replaces the trailing repeated body segment instead of the first matching thread text", async () => {
     const existingFileBlock =
       '<file name="report.pdf" mime="application/pdf">\nold extracted content\n</file>';

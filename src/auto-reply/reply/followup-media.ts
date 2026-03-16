@@ -1,4 +1,3 @@
-import path from "node:path";
 import { logVerbose } from "../../globals.js";
 import { applyMediaUnderstanding } from "../../media-understanding/apply.js";
 import {
@@ -14,6 +13,7 @@ const MEDIA_ONLY_PLACEHOLDER = "[User sent media without caption]";
 const MEDIA_REPLY_HINT_PREFIX = "To send an image back, prefer the message tool";
 const LEADING_MEDIA_ATTACHED_LINE_RE = /^\[media attached(?: \d+\/\d+)?: [^\r\n]*\]$/;
 const FILE_BLOCK_RE = /<file\s+name="/i;
+const FILE_BLOCK_BODY_RE = /<file\s+name="[^"]*"[^>]*>[\s\S]*?<\/file>/i;
 const FILE_BLOCK_FULL_RE = /<file\s+name="[^"]*"[^>]*>[\s\S]*?<\/file>\n?/gi;
 
 function stripExistingFileBlocks(text: string): string {
@@ -123,57 +123,12 @@ function replaceOccurrenceAtIndex(
   return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
 }
 
-function decodeXmlAttr(value: string): string {
-  return value
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
-}
-
-function extractAttachmentFileName(value?: string): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed)) {
-    try {
-      const pathname = new URL(trimmed).pathname;
-      const basename = path.posix.basename(pathname);
-      return basename || undefined;
-    } catch {
-      // Fall back to path-style parsing below.
-    }
-  }
-  const normalized = trimmed.replace(/\\/g, "/");
-  const basename = path.posix.basename(normalized);
-  return basename || undefined;
-}
-
-function bodyContainsMatchingFileBlock(mediaContext: FollowupMediaContext): boolean {
-  const body = mediaContext.Body?.trim();
-  if (!body || !FILE_BLOCK_RE.test(body)) {
-    return false;
-  }
-  const bodyFileNames = new Set<string>();
-  for (const match of body.matchAll(/<file\s+name="([^"]*)"[^>]*>/gi)) {
-    const fileName = match[1]?.trim();
-    if (fileName) {
-      bodyFileNames.add(decodeXmlAttr(fileName));
-    }
-  }
-  if (bodyFileNames.size === 0) {
-    return false;
-  }
-  return normalizeAttachments(mediaContext as MsgContext).some((attachment) => {
-    const fileName = extractAttachmentFileName(attachment.path ?? attachment.url);
-    return Boolean(fileName && bodyFileNames.has(fileName));
-  });
-}
-
 function stripInlineDirectives(text: string | undefined): string {
   return parseInlineDirectives(text ?? "").cleaned.trim();
+}
+
+function bodyContainsExtractedFileBlock(text: string | undefined): boolean {
+  return FILE_BLOCK_BODY_RE.test(text ?? "");
 }
 
 function normalizeUpdatedBody(params: { originalBody?: string; updatedBody?: string }): string {
@@ -336,10 +291,12 @@ export async function applyDeferredMediaUnderstandingToQueuedRun(
     mediaContext.DeferredMediaApplied = true;
     return;
   }
+
   const referenceBody = mediaContext.RawBody ?? mediaContext.Body;
   // Prefer RawBody-vs-Body comparison when RawBody exists. If RawBody is
-  // missing, fall back to explicit file-extraction signals instead of
-  // re-running extraction just because the clean pre-extraction body is gone.
+  // missing, any real <file>...</file> block plus file-like attachments means
+  // extraction already ran, even if the stored name came from Content-Disposition
+  // instead of the attachment path/url basename.
   if (!mediaContext.DeferredFileBlocksExtracted && hasAnyFileAttachments(mediaContext)) {
     const rawBodyMissing = typeof mediaContext.RawBody !== "string";
     if (mediaContext.Body !== referenceBody) {
@@ -347,7 +304,7 @@ export async function applyDeferredMediaUnderstandingToQueuedRun(
     } else if (
       rawBodyMissing &&
       (Boolean(mediaContext.MediaUnderstanding?.length) ||
-        bodyContainsMatchingFileBlock(mediaContext))
+        bodyContainsExtractedFileBlock(mediaContext.Body))
     ) {
       mediaContext.DeferredFileBlocksExtracted = true;
     }
