@@ -103,9 +103,9 @@ describe("retryAsync", () => {
     expect(delays[0]).toBe(500);
   });
 
-  it("clamps retryAfterMs to maxDelayMs", async () => {
+  it("honours retryAfterMs even when it exceeds maxDelayMs (server-directed delay)", async () => {
     const delays = await runRetryAfterCase({ minDelayMs: 0, maxDelayMs: 100, retryAfterMs: 500 });
-    expect(delays[0]).toBe(100);
+    expect(delays[0]).toBe(500);
   });
 
   it("clamps retryAfterMs to minDelayMs", async () => {

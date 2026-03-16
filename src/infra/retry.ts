@@ -117,9 +117,16 @@ export async function retryAsync<T>(
       const baseDelay = hasRetryAfter
         ? Math.max(retryAfterMs, minDelayMs)
         : minDelayMs * 2 ** (attempt - 1);
-      let delay = Math.min(baseDelay, maxDelayMs);
+      // When the server provides an explicit retry_after, honour the full
+      // interval instead of capping at maxDelayMs.  The cap only applies to
+      // computed exponential-backoff delays — premature retries against a
+      // server-directed flood-control window exhaust attempts and make the
+      // rate-limit worse.
+      let delay = hasRetryAfter ? baseDelay : Math.min(baseDelay, maxDelayMs);
       delay = applyJitter(delay, jitter);
-      delay = Math.min(Math.max(delay, minDelayMs), maxDelayMs);
+      delay = hasRetryAfter
+        ? Math.max(delay, minDelayMs)
+        : Math.min(Math.max(delay, minDelayMs), maxDelayMs);
 
       options.onRetry?.({
         attempt,
