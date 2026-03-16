@@ -292,26 +292,20 @@ export async function applyDeferredMediaUnderstandingToQueuedRun(
     return;
   }
 
-  const referenceBody = mediaContext.RawBody ?? mediaContext.Body;
-  // Prefer RawBody-vs-Body comparison when RawBody exists. If RawBody is
-  // missing, any real <file>...</file> block plus file-like attachments means
-  // extraction already ran, even if the stored name came from Content-Disposition
-  // instead of the attachment path/url basename.
-  if (!mediaContext.DeferredFileBlocksExtracted && hasAnyFileAttachments(mediaContext)) {
-    const rawBodyMissing = typeof mediaContext.RawBody !== "string";
-    if (mediaContext.Body !== referenceBody) {
-      mediaContext.DeferredFileBlocksExtracted = true;
-    } else if (
-      rawBodyMissing &&
-      (Boolean(mediaContext.MediaUnderstanding?.length) ||
-        bodyContainsExtractedFileBlock(mediaContext.Body))
-    ) {
-      mediaContext.DeferredFileBlocksExtracted = true;
-    }
-  }
   if (mediaContext.MediaUnderstanding?.length) {
     mediaContext.DeferredMediaApplied = true;
     return;
+  }
+  // Treat followup file extraction as already applied only when we have explicit
+  // evidence: the queue snapshot already flagged it or Body already contains a
+  // real extracted <file>...</file> block. Body/RawBody mismatches are not
+  // reliable because some channels wrap Body with envelope metadata.
+  if (
+    !mediaContext.DeferredFileBlocksExtracted &&
+    hasAnyFileAttachments(mediaContext) &&
+    bodyContainsExtractedFileBlock(mediaContext.Body)
+  ) {
+    mediaContext.DeferredFileBlocksExtracted = true;
   }
 
   if (mediaContext.DeferredFileBlocksExtracted && hasOnlyFileLikeAttachments(mediaContext)) {

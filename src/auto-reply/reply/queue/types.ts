@@ -52,9 +52,9 @@ export type FollowupMediaContext = {
   DeferredMediaApplied?: boolean;
   /**
    * Set when file extraction has already been applied to Body (either in the
-   * primary path or by a previous deferred-media run).  Checked instead of
-   * scanning body text for `<file` patterns to avoid false-positives on user
-   * messages that contain literal XML-like text.
+   * primary path or by a previous deferred-media run). This avoids re-running
+   * file extraction when Body already contains real extracted `<file>...</file>`
+   * blocks.
    */
   DeferredFileBlocksExtracted?: boolean;
 };

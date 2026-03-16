@@ -1526,6 +1526,54 @@ describe("createFollowupRunner media understanding", () => {
     expect(agentCall?.prompt?.match(/<file\b/g)).toHaveLength(1);
   });
 
+  it("does not infer file extraction from wrapped Body/RawBody mismatches", async () => {
+    const fileBlock = '<file name="report.pdf" mime="application/pdf">\nreport content\n</file>';
+    applyMediaUnderstandingMock.mockImplementationOnce(
+      async (params: { ctx: Record<string, unknown> }) => {
+        params.ctx.Body = `summarize this\n\n${fileBlock}`;
+        return {
+          outputs: [],
+          decisions: [],
+          appliedImage: false,
+          appliedAudio: false,
+          appliedVideo: false,
+          appliedFile: true,
+        };
+      },
+    );
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({
+      payloads: [{ text: "file processed" }],
+      meta: {},
+    });
+
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: vi.fn(async () => {}) },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude-opus-4-5",
+    });
+
+    await runner(
+      createQueuedRun({
+        prompt: "[media attached: /tmp/report.pdf]\nLine: Alice\nsummarize this",
+        mediaContext: {
+          Body: "Line: Alice\nsummarize this",
+          RawBody: "summarize this",
+          MediaPaths: ["/tmp/report.pdf"],
+          MediaTypes: ["application/pdf"],
+        },
+      }),
+    );
+
+    expect(applyMediaUnderstandingMock).toHaveBeenCalledTimes(1);
+    const agentCall = runEmbeddedPiAgentMock.mock.calls.at(-1)?.[0] as {
+      prompt?: string;
+    };
+    expect(agentCall?.prompt).toContain("Line: Alice");
+    expect(agentCall?.prompt).toContain(fileBlock);
+    expect(agentCall?.prompt?.match(/<file\s+name="report\.pdf"/g)).toHaveLength(1);
+  });
+
   it("preserves non-audio media lines when only audio is transcribed", async () => {
     applyMediaUnderstandingMock.mockImplementationOnce(
       async (params: { ctx: Record<string, unknown> }) => {
