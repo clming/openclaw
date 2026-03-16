@@ -20,6 +20,7 @@ import { buildPassiveProbedChannelStatusSummary } from "openclaw/plugin-sdk/exte
 import { resolveThreadSessionKeys, type RoutePeer } from "openclaw/plugin-sdk/routing";
 import {
   listEnabledSlackAccounts,
+  listSlackAccountIds,
   resolveSlackAccount,
   resolveSlackReplyToMode,
   type ResolvedSlackAccount,
@@ -48,6 +49,11 @@ import {
   type ChannelPlugin,
   type OpenClawConfig,
 } from "./runtime-api.js";
+import {
+  isSlackExecApprovalClientEnabled,
+  resolveSlackExecApprovalTarget,
+  shouldSuppressLocalSlackExecApprovalPrompt,
+} from "./exec-approvals.js";
 import { getSlackRuntime } from "./runtime.js";
 import { fetchSlackScopes } from "./scopes.js";
 import { slackSetupAdapter } from "./setup-core.js";
@@ -613,6 +619,23 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
         ...base,
         ...projectCredentialSnapshotFields(account),
       };
+    },
+  },
+  execApprovals: {
+    getInitiatingSurfaceState: ({ cfg, accountId }) =>
+      isSlackExecApprovalClientEnabled({ cfg, accountId })
+        ? { kind: "enabled" }
+        : { kind: "disabled" },
+    shouldSuppressLocalPrompt: ({ cfg, accountId, payload }) =>
+      shouldSuppressLocalSlackExecApprovalPrompt({ cfg, accountId, payload }),
+    hasConfiguredDmRoute: ({ cfg }) => {
+      return listSlackAccountIds(cfg).some((accountId) => {
+        if (!isSlackExecApprovalClientEnabled({ cfg, accountId })) {
+          return false;
+        }
+        const target = resolveSlackExecApprovalTarget({ cfg, accountId });
+        return target === "dm" || target === "both";
+      });
     },
   },
   gateway: {

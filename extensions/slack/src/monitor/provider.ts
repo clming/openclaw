@@ -27,6 +27,7 @@ import { createNonExitingRuntime, type RuntimeEnv } from "openclaw/plugin-sdk/ru
 import { normalizeStringEntries } from "openclaw/plugin-sdk/text-runtime";
 import { resolveSlackAccount } from "../accounts.js";
 import { resolveSlackWebClientOptions } from "../client.js";
+import { SlackExecApprovalHandler } from "../exec-approvals-handler.js";
 import { normalizeSlackWebhookPath, registerSlackHttpHandler } from "../http/index.js";
 import { resolveSlackChannelAllowlist } from "../resolve-channels.js";
 import { resolveSlackUserAllowlist } from "../resolve-users.js";
@@ -313,6 +314,15 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
     );
   }
 
+  const execApprovalsHandler = new SlackExecApprovalHandler({
+    botToken,
+    accountId: account.accountId,
+    cfg,
+    client: app.client,
+    runtime,
+  });
+  await execApprovalsHandler.start();
+
   const ctx = createSlackMonitorContext({
     cfg,
     accountId: account.accountId,
@@ -567,6 +577,7 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
   } finally {
     opts.abortSignal?.removeEventListener("abort", stopOnAbort);
     unregisterHttpHandler?.();
+    await execApprovalsHandler.stop().catch(() => {});
     await app.stop().catch(() => undefined);
   }
 }
