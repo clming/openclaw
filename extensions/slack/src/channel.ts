@@ -637,6 +637,18 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
         return target === "dm" || target === "both";
       });
     },
+    shouldSuppressForwardingFallback: ({ cfg, target, request }) => {
+      const channel = target.channel?.trim().toLowerCase();
+      if (channel !== "slack") {
+        return false;
+      }
+      const requestChannel = request.request.turnSourceChannel?.trim().toLowerCase() ?? "";
+      if (requestChannel !== "slack") {
+        return false;
+      }
+      const accountId = target.accountId?.trim() || request.request.turnSourceAccountId?.trim();
+      return isSlackExecApprovalClientEnabled({ cfg, accountId });
+    },
   },
   gateway: {
     startAccount: async (ctx) => {

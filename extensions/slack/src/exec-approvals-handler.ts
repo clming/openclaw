@@ -342,6 +342,10 @@ export class SlackExecApprovalHandler {
     this.pending.set(request.id, pendingEntry);
 
     for (const target of resolvedTargets) {
+      // Abort remaining sends if a concurrent resolve already cleared us.
+      if (!this.pending.has(request.id)) {
+        break;
+      }
       try {
         let channelId: string;
         if (target.kind === "user") {
