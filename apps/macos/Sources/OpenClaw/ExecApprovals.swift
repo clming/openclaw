@@ -528,9 +528,13 @@ enum ExecApprovalsStore {
                 return ExecAllowlistEntry(
                     id: item.id,
                     pattern: item.pattern,
+                    args: item.args,
+                    matchMode: item.matchMode,
                     lastUsedAt: Date().timeIntervalSince1970 * 1000,
                     lastUsedCommand: command,
-                    lastResolvedPath: resolvedPath)
+                    lastResolvedPath: resolvedPath,
+                    createdAt: item.createdAt,
+                    createdFrom: item.createdFrom)
             }
             entry.allowlist = allowlist
             agents[key] = entry
