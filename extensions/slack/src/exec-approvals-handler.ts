@@ -133,7 +133,14 @@ function resolveSlackSourceTarget(params: {
     ) {
       return null;
     }
-    return { id: turnSourceTo, kind: "channel" };
+    const rawThreadId = params.request.request.turnSourceThreadId;
+    const threadTs =
+      typeof rawThreadId === "string" && rawThreadId.trim()
+        ? rawThreadId.trim()
+        : typeof rawThreadId === "number"
+          ? String(rawThreadId)
+          : undefined;
+    return { id: turnSourceTo, kind: "channel", threadTs };
   }
 
   const sessionTarget = resolveExecApprovalSessionTarget({
@@ -153,7 +160,9 @@ function resolveSlackSourceTarget(params: {
   ) {
     return null;
   }
-  return { id: sessionTarget.to, kind: "channel" };
+  const sessionThreadTs =
+    typeof sessionTarget.threadId === "number" ? String(sessionTarget.threadId) : undefined;
+  return { id: sessionTarget.to, kind: "channel", threadTs: sessionThreadTs };
 }
 
 function dedupeTargets(targets: SlackApprovalTarget[]): SlackApprovalTarget[] {
@@ -321,7 +330,15 @@ export class SlackExecApprovalHandler {
       approvalId: request.id,
       text: messageText,
     });
-    const sentMessages: PendingMessage[] = [];
+    // Register pending entry before sending so a resolve event arriving
+    // during the send window is not dropped.
+    const timeoutMs = Math.max(0, request.expiresAtMs - this.nowMs());
+    const timeoutId = setTimeout(() => {
+      void this.handleResolved({ id: request.id, decision: "deny", ts: Date.now() });
+    }, timeoutMs);
+    timeoutId.unref?.();
+    const pendingEntry: PendingApproval = { timeoutId, messages: [] };
+    this.pending.set(request.id, pendingEntry);
 
     for (const target of resolvedTargets) {
       try {
@@ -347,27 +364,17 @@ export class SlackExecApprovalHandler {
           ...(target.threadTs ? { thread_ts: target.threadTs } : {}),
         });
         if (result.ts) {
-          sentMessages.push({ channelId, ts: result.ts });
+          pendingEntry.messages.push({ channelId, ts: result.ts });
         }
       } catch (err) {
         log.error(`slack exec approvals: failed to send request ${request.id}: ${String(err)}`);
       }
     }
 
-    if (sentMessages.length === 0) {
-      return;
+    if (pendingEntry.messages.length === 0) {
+      clearTimeout(timeoutId);
+      this.pending.delete(request.id);
     }
-
-    const timeoutMs = Math.max(0, request.expiresAtMs - this.nowMs());
-    const timeoutId = setTimeout(() => {
-      void this.handleResolved({ id: request.id, decision: "deny", ts: Date.now() });
-    }, timeoutMs);
-    timeoutId.unref?.();
-
-    this.pending.set(request.id, {
-      timeoutId,
-      messages: sentMessages,
-    });
   }
 
   async handleResolved(resolved: ExecApprovalResolved): Promise<void> {
