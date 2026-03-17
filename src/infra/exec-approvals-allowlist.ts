@@ -234,11 +234,15 @@ function evaluateSegments(
           })
         : undefined;
     const shellScriptMatch = shellScriptCandidatePath
-      ? matchAllowlist(params.allowlist, {
-          rawExecutable: shellScriptCandidatePath,
-          resolvedPath: shellScriptCandidatePath,
-          executableName: path.basename(shellScriptCandidatePath),
-        }, effectiveArgv)
+      ? matchAllowlist(
+          params.allowlist,
+          {
+            rawExecutable: shellScriptCandidatePath,
+            resolvedPath: shellScriptCandidatePath,
+            executableName: path.basename(shellScriptCandidatePath),
+          },
+          effectiveArgv,
+        )
       : null;
     const match = executableMatch ?? shellScriptMatch;
     if (match) {
@@ -420,9 +424,7 @@ export type AllowAlwaysResolvedEntry = {
 };
 
 function allowAlwaysEntryKey(entry: AllowAlwaysResolvedEntry): string {
-  return entry.args != null
-    ? `${entry.pattern}\0${JSON.stringify(entry.args)}`
-    : entry.pattern;
+  return entry.args != null ? `${entry.pattern}\0${JSON.stringify(entry.args)}` : entry.pattern;
 }
 
 function collectAllowAlwaysEntries(params: {
@@ -489,8 +491,7 @@ function collectAllowAlwaysEntries(params: {
 
   // Resolve the effective argv for the segment (after dispatch wrapper unwrapping etc.)
   const effectiveArgv =
-    params.segment.resolution?.effectiveArgv &&
-    params.segment.resolution.effectiveArgv.length > 0
+    params.segment.resolution?.effectiveArgv && params.segment.resolution.effectiveArgv.length > 0
       ? params.segment.resolution.effectiveArgv
       : params.segment.argv;
 

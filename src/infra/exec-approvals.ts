@@ -188,9 +188,7 @@ function mergeLegacyAgent(
     if (!patternKey) {
       return;
     }
-    const key = entry.args != null
-      ? `${patternKey}\0${JSON.stringify(entry.args)}`
-      : patternKey;
+    const key = entry.args != null ? `${patternKey}\0${JSON.stringify(entry.args)}` : patternKey;
     if (seen.has(key)) {
       return;
     }
@@ -548,15 +546,14 @@ export function addAllowlistEntry(
   }
   // Dedup key includes args when present so `python3 foo.py` and `python3 bar.py`
   // produce distinct entries.
-  const dedupKey = args != null
-    ? `${trimmed}\0${JSON.stringify(args)}`
-    : trimmed;
-  if (allowlist.some((entry) => {
-    const entryKey = entry.args != null
-      ? `${entry.pattern}\0${JSON.stringify(entry.args)}`
-      : entry.pattern;
-    return entryKey === dedupKey;
-  })) {
+  const dedupKey = args != null ? `${trimmed}\0${JSON.stringify(args)}` : trimmed;
+  if (
+    allowlist.some((entry) => {
+      const entryKey =
+        entry.args != null ? `${entry.pattern}\0${JSON.stringify(entry.args)}` : entry.pattern;
+      return entryKey === dedupKey;
+    })
+  ) {
     return;
   }
   const now = Date.now();

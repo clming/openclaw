@@ -659,25 +659,37 @@ enum ExecApprovalsStore {
             return ExecAllowlistEntry(
                 id: entry.id,
                 pattern: pattern,
+                args: entry.args,
+                matchMode: entry.matchMode,
                 lastUsedAt: entry.lastUsedAt,
                 lastUsedCommand: entry.lastUsedCommand,
-                lastResolvedPath: normalizedResolved)
+                lastResolvedPath: normalizedResolved,
+                createdAt: entry.createdAt,
+                createdFrom: entry.createdFrom)
         case .invalid:
             switch ExecApprovalHelpers.validateAllowlistPattern(trimmedResolved) {
             case let .valid(migratedPattern):
                 return ExecAllowlistEntry(
                     id: entry.id,
                     pattern: migratedPattern,
+                    args: entry.args,
+                    matchMode: entry.matchMode,
                     lastUsedAt: entry.lastUsedAt,
                     lastUsedCommand: entry.lastUsedCommand,
-                    lastResolvedPath: normalizedResolved)
+                    lastResolvedPath: normalizedResolved,
+                    createdAt: entry.createdAt,
+                    createdFrom: entry.createdFrom)
             case .invalid:
                 return ExecAllowlistEntry(
                     id: entry.id,
                     pattern: trimmedPattern,
+                    args: entry.args,
+                    matchMode: entry.matchMode,
                     lastUsedAt: entry.lastUsedAt,
                     lastUsedCommand: entry.lastUsedCommand,
-                    lastResolvedPath: normalizedResolved)
+                    lastResolvedPath: normalizedResolved,
+                    createdAt: entry.createdAt,
+                    createdFrom: entry.createdFrom)
             }
         }
     }
@@ -702,9 +714,13 @@ enum ExecApprovalsStore {
                     ExecAllowlistEntry(
                         id: migrated.id,
                         pattern: pattern,
+                        args: migrated.args,
+                        matchMode: migrated.matchMode,
                         lastUsedAt: migrated.lastUsedAt,
                         lastUsedCommand: migrated.lastUsedCommand,
-                        lastResolvedPath: normalizedResolvedPath))
+                        lastResolvedPath: normalizedResolvedPath,
+                        createdAt: migrated.createdAt,
+                        createdFrom: migrated.createdFrom))
             case let .invalid(reason):
                 if dropInvalid {
                     rejected.append(
@@ -717,9 +733,13 @@ enum ExecApprovalsStore {
                         ExecAllowlistEntry(
                             id: migrated.id,
                             pattern: trimmedPattern,
+                            args: migrated.args,
+                            matchMode: migrated.matchMode,
                             lastUsedAt: migrated.lastUsedAt,
                             lastUsedCommand: migrated.lastUsedCommand,
-                            lastResolvedPath: normalizedResolvedPath))
+                            lastResolvedPath: normalizedResolvedPath,
+                            createdAt: migrated.createdAt,
+                            createdFrom: migrated.createdFrom))
                 }
             }
         }
@@ -736,9 +756,14 @@ enum ExecApprovalsStore {
         var seen = Set<String>()
         var allowlist: [ExecAllowlistEntry] = []
         func append(_ entry: ExecAllowlistEntry) {
-            guard let key = self.normalizedPattern(entry.pattern), !seen.contains(key) else {
-                return
+            guard let patternKey = self.normalizedPattern(entry.pattern) else { return }
+            let key: String
+            if let args = entry.args {
+                key = "\(patternKey)\0\(args.joined(separator: "\0"))"
+            } else {
+                key = patternKey
             }
+            guard !seen.contains(key) else { return }
             seen.insert(key)
             allowlist.append(entry)
         }

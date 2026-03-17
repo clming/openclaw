@@ -1,7 +1,11 @@
 import Foundation
 
 enum ExecAllowlistMatcher {
-    static func match(entries: [ExecAllowlistEntry], resolution: ExecCommandResolution?) -> ExecAllowlistEntry? {
+    static func match(
+        entries: [ExecAllowlistEntry],
+        resolution: ExecCommandResolution?,
+        command: [String]? = nil
+    ) -> ExecAllowlistEntry? {
         guard let resolution, !entries.isEmpty else { return nil }
         let rawExecutable = resolution.rawExecutable
         let resolvedPath = resolution.resolvedPath
@@ -10,7 +14,14 @@ enum ExecAllowlistMatcher {
             switch ExecApprovalHelpers.validateAllowlistPattern(entry.pattern) {
             case let .valid(pattern):
                 let target = resolvedPath ?? rawExecutable
-                if self.matches(pattern: pattern, target: target) { return entry }
+                if self.matches(pattern: pattern, target: target) {
+                    // For exact-match entries, also require args to match element-by-element.
+                    if entry.matchMode == "exact", let requiredArgs = entry.args {
+                        let commandArgs = command.map { Array($0.dropFirst()) } ?? []
+                        guard commandArgs == requiredArgs else { continue }
+                    }
+                    return entry
+                }
             case .invalid:
                 continue
             }
@@ -20,13 +31,14 @@ enum ExecAllowlistMatcher {
 
     static func matchAll(
         entries: [ExecAllowlistEntry],
-        resolutions: [ExecCommandResolution]) -> [ExecAllowlistEntry]
-    {
+        resolutions: [ExecCommandResolution],
+        command: [String]? = nil
+    ) -> [ExecAllowlistEntry] {
         guard !entries.isEmpty, !resolutions.isEmpty else { return [] }
         var matches: [ExecAllowlistEntry] = []
         matches.reserveCapacity(resolutions.count)
         for resolution in resolutions {
-            guard let match = self.match(entries: entries, resolution: resolution) else {
+            guard let match = self.match(entries: entries, resolution: resolution, command: command) else {
                 return []
             }
             matches.append(match)

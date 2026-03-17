@@ -804,9 +804,12 @@ extension MacNodeRuntime {
             guard let entry = ExecApprovalHelpers.allowlistEntry(command: command, resolution: candidate) else {
                 continue
             }
-            let key = entry.args != nil
-                ? "\(entry.pattern)\0\(entry.args!)"
-                : entry.pattern
+            let key: String
+            if let args = entry.args {
+                key = "\(entry.pattern)\0\(args.joined(separator: "\0"))"
+            } else {
+                key = entry.pattern
+            }
             if seenKeys.insert(key).inserted {
                 ExecApprovalsStore.addAllowlistEntry(
                     agentId: agentId,
