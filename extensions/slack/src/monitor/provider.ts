@@ -357,8 +357,6 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
     removeAckAfterReply,
   });
 
-  ctx.clearExecApprovalPending = (approvalId) => execApprovalsHandler.clearPending(approvalId);
-
   // Wire up event liveness tracking: update lastEventAt on every inbound event
   // so the health monitor can detect "half-dead" sockets that pass health checks
   // but silently stop delivering events.

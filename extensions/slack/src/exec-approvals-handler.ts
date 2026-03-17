@@ -224,15 +224,6 @@ export class SlackExecApprovalHandler {
     this.nowMs = deps.nowMs ?? Date.now;
   }
 
-  /** Remove a pending approval so the gateway echo becomes a no-op. */
-  clearPending(approvalId: string): void {
-    const pending = this.pending.get(approvalId);
-    if (pending) {
-      clearTimeout(pending.timeoutId);
-      this.pending.delete(approvalId);
-    }
-  }
-
   shouldHandle(request: ExecApprovalRequest): boolean {
     return matchesFilters({
       cfg: this.opts.cfg,
@@ -393,19 +384,20 @@ export class SlackExecApprovalHandler {
         : resolved.decision === "allow-always"
           ? "Allowed (always)"
           : "Denied";
+    const byLabel = resolved.resolvedBy ? ` by ${resolved.resolvedBy}` : "";
 
     await Promise.allSettled(
       pending.messages.map(async (message) => {
         await this.opts.client.chat.update({
           channel: message.channelId,
           ts: message.ts,
-          text: `Exec approval resolved: ${decisionLabel}`,
+          text: `Exec approval resolved: ${decisionLabel}${byLabel}`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `:white_check_mark: Exec approval resolved: *${decisionLabel}*`,
+                text: `:white_check_mark: Exec approval resolved: *${decisionLabel}*${byLabel}`,
               },
             },
           ],

@@ -751,47 +751,19 @@ async function handleSlackExecApprovalAction(params: {
   try {
     await callGateway({
       method: "exec.approval.resolve",
-      params: { id: approvalId, decision, resolvedBy },
+      params: { id: approvalId, decision },
       clientName: GATEWAY_CLIENT_NAMES.GATEWAY_CLIENT,
       clientDisplayName: `Slack approval (${resolvedBy})`,
       mode: GATEWAY_CLIENT_MODES.BACKEND,
     });
-    // Clear pending before the gateway echo arrives so handleResolved
-    // doesn't overwrite the button-click message (which includes attribution).
-    params.ctx.clearExecApprovalPending?.(approvalId);
   } catch (err) {
     await respondEphemeral(params.respond, `Failed to submit approval: ${String(err)}`);
     return true;
   }
 
-  const decisionLabel =
-    decision === "allow-once"
-      ? "Allowed (once)"
-      : decision === "allow-always"
-        ? "Allowed (always)"
-        : "Denied";
-
-  // Update the message to remove buttons and show result.
-  try {
-    await updateSlackInteractionMessage({
-      ctx: params.ctx,
-      channelId: parsed.channelId,
-      messageTs: parsed.messageTs,
-      text: `Exec approval resolved: ${decisionLabel}`,
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `:white_check_mark: Exec approval resolved: *${escapeSlackMrkdwn(decisionLabel)}* by <@${parsed.userId}>`,
-          },
-        },
-      ],
-    });
-  } catch {
-    // Best-effort message update.
-  }
-
+  // The gateway broadcasts exec.approval.resolved which triggers
+  // SlackExecApprovalHandler.handleResolved to update all posted messages
+  // (including multi-target DMs). No local message update needed here.
   await respondEphemeral(params.respond, `Exec approval ${decision} submitted.`);
   return true;
 }
