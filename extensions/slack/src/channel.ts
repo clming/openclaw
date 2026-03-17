@@ -629,7 +629,7 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount> = {
     shouldSuppressLocalPrompt: ({ cfg, accountId, payload }) =>
       shouldSuppressLocalSlackExecApprovalPrompt({ cfg, accountId, payload }),
     hasConfiguredDmRoute: ({ cfg }) => {
-      return listSlackAccountIds(cfg).some((accountId) => {
+      return listEnabledSlackAccounts(cfg).some(({ accountId }) => {
         if (!isSlackExecApprovalClientEnabled({ cfg, accountId })) {
           return false;
         }
