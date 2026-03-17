@@ -22,6 +22,7 @@ import {
   resolveSlackExecApprovalConfig,
   resolveSlackExecApprovalTarget,
 } from "./exec-approvals.js";
+import { parseSlackTarget } from "./targets.js";
 import { truncateSlackText } from "./truncate.js";
 
 const log = createSubsystemLogger("slack/exec-approvals");
@@ -134,6 +135,10 @@ function resolveSlackSourceTarget(params: {
     ) {
       return null;
     }
+    // Normalize prefixed targets (e.g. "user:U123", "channel:C456") to raw IDs.
+    const parsed = parseSlackTarget(turnSourceTo, { defaultKind: "channel" });
+    const targetId = parsed?.id ?? turnSourceTo;
+    const targetKind: "user" | "channel" = parsed?.kind === "user" ? "user" : "channel";
     const rawThreadId = params.request.request.turnSourceThreadId;
     const threadTs =
       typeof rawThreadId === "string" && rawThreadId.trim()
@@ -141,7 +146,7 @@ function resolveSlackSourceTarget(params: {
         : typeof rawThreadId === "number"
           ? String(rawThreadId)
           : undefined;
-    return { id: turnSourceTo, kind: "channel", threadTs };
+    return { id: targetId, kind: targetKind, threadTs };
   }
 
   const sessionTarget = resolveExecApprovalSessionTarget({
@@ -161,9 +166,13 @@ function resolveSlackSourceTarget(params: {
   ) {
     return null;
   }
+  // Normalize prefixed session targets the same way.
+  const sessionParsed = parseSlackTarget(sessionTarget.to, { defaultKind: "channel" });
+  const sessionTargetId = sessionParsed?.id ?? sessionTarget.to;
+  const sessionTargetKind: "user" | "channel" = sessionParsed?.kind === "user" ? "user" : "channel";
   const sessionThreadTs =
     typeof sessionTarget.threadId === "number" ? String(sessionTarget.threadId) : undefined;
-  return { id: sessionTarget.to, kind: "channel", threadTs: sessionThreadTs };
+  return { id: sessionTargetId, kind: sessionTargetKind, threadTs: sessionThreadTs };
 }
 
 function dedupeTargets(targets: SlackApprovalTarget[]): SlackApprovalTarget[] {
