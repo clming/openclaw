@@ -1,6 +1,74 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import mermaid from "mermaid";
 import { truncateText } from "./format.ts";
+
+// Initialize mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "default",
+  securityLevel: "strict",
+});
+
+// Extend Window interface for mermaid copy handler
+declare global {
+  interface Window {
+    __copyMermaid?: (encodedCode: string, btn: HTMLElement) => void;
+  }
+}
+
+// Global mermaid copy handler (called from inline onclick)
+window.__copyMermaid = (encodedCode: string, btn: HTMLElement) => {
+  const code = decodeURIComponent(encodedCode);
+  navigator.clipboard.writeText(code).then(
+    () => {
+      // Show feedback
+      const icon = btn.querySelector(".copy-icon");
+      if (icon) {
+        const original = icon.textContent;
+        icon.textContent = "✅";
+        setTimeout(() => (icon.textContent = original), 1500);
+      }
+    },
+    (err) => {
+      console.error("[mermaid-copy] copy failed:", err);
+    },
+  );
+};
+
+// Global mermaid fullscreen handler - use event delegation
+document.addEventListener("click", (e) => {
+  const container = (e.target as HTMLElement).closest(".mermaid-container");
+  if (!container) {
+    return;
+  }
+  const svg = container.querySelector("svg");
+  if (!svg) {
+    return;
+  }
+
+  // Create fullscreen container
+  let fullscreenContainer = document.querySelector(".mermaid-fullscreen") as HTMLDivElement;
+  if (!fullscreenContainer) {
+    fullscreenContainer = document.createElement("div");
+    fullscreenContainer.className = "mermaid-fullscreen";
+    fullscreenContainer.innerHTML = `<span class="mermaid-fullscreen-hint">点击任意位置关闭</span>`;
+    fullscreenContainer.addEventListener("click", () => {
+      fullscreenContainer.classList.remove("active");
+    });
+    document.body.appendChild(fullscreenContainer);
+  }
+
+  // Clone and append SVG
+  fullscreenContainer.innerHTML = "";
+  const clonedSvg = svg.cloneNode(true) as SVGElement;
+  clonedSvg.style.background = "white";
+  clonedSvg.style.borderRadius = "8px";
+  fullscreenContainer.appendChild(clonedSvg);
+  fullscreenContainer.innerHTML += `<span class="mermaid-fullscreen-hint">点击任意位置关闭</span>`;
+  fullscreenContainer.classList.add("active");
+  console.log("[mermaid-fullscreen] opened");
+});
 
 const allowedTags = [
   "a",
@@ -48,6 +116,7 @@ const allowedAttrs = [
   "data-code",
   "type",
   "aria-label",
+  "onclick",
 ];
 const sanitizeOptions = {
   ALLOWED_TAGS: allowedTags,
@@ -184,6 +253,34 @@ htmlEscapeRenderer.code = ({
   lang?: string;
   escaped?: boolean;
 }) => {
+  // Handle mermaid code blocks
+  if (lang === "mermaid") {
+    const trimmed = text.trim();
+    const escapedCode = escapeHtml(trimmed);
+    // Create enhanced container with source code and copy button
+    // Use encodeURIComponent to safely pass the code in onclick
+    const encodedCode = encodeURIComponent(trimmed);
+    const copyBtn = `<button type="button" class="mermaid-copy" data-code="${escapedCode}" onclick="window.__copyMermaid && window.__copyMermaid('${encodedCode}', this)" aria-label="Copy mermaid code">
+      <span class="copy-icon">📋</span>
+    </button>`;
+    const header = `<div class="mermaid-header">
+      <span class="mermaid-label">mermaid</span>
+      ${copyBtn}
+    </div>`;
+    const sourceCode = `<pre class="mermaid-source"><code>${escapedCode}</code></pre>`;
+    // Container with mermaid graph placeholder and source code
+    return `<div class="mermaid-wrapper">
+      ${header}
+      <div class="mermaid-container">
+        <div class="mermaid">${escapedCode}</div>
+      </div>
+      <details class="mermaid-source-details">
+        <summary>显示源码</summary>
+        ${sourceCode}
+      </details>
+    </div>`;
+  }
+
   const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : "";
   const safeText = escaped ? text : escapeHtml(text);
   const codeBlock = `<pre><code${langClass}>${safeText}</code></pre>`;
@@ -223,4 +320,34 @@ function escapeHtml(value: string): string {
 
 function renderEscapedPlainTextHtml(value: string): string {
   return `<div class="markdown-plain-text-fallback">${escapeHtml(value.replace(/\r\n?/g, "\n"))}</div>`;
+}
+
+// Render mermaid diagrams in a given container element
+export async function renderMermaidInContainer(container: HTMLElement): Promise<void> {
+  const mermaidElements = container.querySelectorAll(".mermaid");
+  if (mermaidElements.length === 0) {
+    return;
+  }
+
+  for (const element of mermaidElements) {
+    // Skip elements that have already been rendered (contain SVG)
+    if (element.querySelector("svg")) {
+      continue;
+    }
+
+    const graphDefinition = element.textContent?.trim() || "";
+    if (!graphDefinition) {
+      continue;
+    }
+
+    try {
+      // Use a unique temp id for mermaid.render to avoid DOM conflicts
+      const tempId = `mermaid-render-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const { svg } = await mermaid.render(tempId, graphDefinition);
+      element.innerHTML = svg;
+    } catch (err) {
+      console.error("[mermaid] render failed:", err);
+      element.innerHTML = `<span class="mermaid-error">Mermaid 渲染失败: ${String(err)}</span>`;
+    }
+  }
 }
