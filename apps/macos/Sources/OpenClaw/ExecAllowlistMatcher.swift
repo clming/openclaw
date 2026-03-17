@@ -16,8 +16,13 @@ enum ExecAllowlistMatcher {
                 let target = resolvedPath ?? rawExecutable
                 if self.matches(pattern: pattern, target: target) {
                     // For exact-match entries, also require args to match element-by-element.
+                    // Unwrap dispatch wrappers (env, nice, etc.) first, matching the
+                    // unwrapping done when persisting entries via allowlistEntry().
                     if entry.matchMode == "exact", let requiredArgs = entry.args {
-                        let commandArgs = command.map { Array($0.dropFirst()) } ?? []
+                        let effective = command.map {
+                            ExecEnvInvocationUnwrapper.unwrapDispatchWrappersForResolution($0)
+                        } ?? []
+                        let commandArgs = Array(effective.dropFirst())
                         guard commandArgs == requiredArgs else { continue }
                     }
                     return entry
