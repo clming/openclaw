@@ -22,6 +22,7 @@ import {
   resolveSlackExecApprovalConfig,
   resolveSlackExecApprovalTarget,
 } from "./exec-approvals.js";
+import { truncateSlackText } from "./truncate.js";
 
 const log = createSubsystemLogger("slack/exec-approvals");
 
@@ -188,7 +189,7 @@ function buildSlackExecApprovalBlocks(params: {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: params.text,
+        text: truncateSlackText(params.text, 3000),
       },
     },
     {
