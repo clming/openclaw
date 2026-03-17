@@ -14,7 +14,10 @@ import {
 } from "../../../../../src/utils/message-channel.js";
 import { SLACK_REPLY_BUTTON_ACTION_ID, SLACK_REPLY_SELECT_ACTION_ID } from "../../blocks-render.js";
 import { SLACK_EXEC_APPROVAL_ACTION_PREFIX } from "../../exec-approvals-handler.js";
-import { isSlackExecApprovalApprover } from "../../exec-approvals.js";
+import {
+  isSlackExecApprovalApprover,
+  isSlackExecApprovalClientEnabled,
+} from "../../exec-approvals.js";
 import { authorizeSlackSystemEventSender } from "../auth.js";
 import type { SlackMonitorContext } from "../context.js";
 import { escapeSlackMrkdwn } from "../mrkdwn.js";
@@ -723,7 +726,16 @@ async function handleSlackExecApprovalAction(params: {
     return false;
   }
 
-  // Only configured approvers can use these buttons.
+  // Exec approvals must be enabled and the user must be a configured approver.
+  if (
+    !isSlackExecApprovalClientEnabled({
+      cfg: params.ctx.cfg,
+      accountId: params.ctx.accountId,
+    })
+  ) {
+    await respondEphemeral(params.respond, "Slack exec approvals are not enabled.");
+    return true;
+  }
   if (
     !isSlackExecApprovalApprover({
       cfg: params.ctx.cfg,
@@ -744,6 +756,9 @@ async function handleSlackExecApprovalAction(params: {
       clientDisplayName: `Slack approval (${resolvedBy})`,
       mode: GATEWAY_CLIENT_MODES.BACKEND,
     });
+    // Clear pending before the gateway echo arrives so handleResolved
+    // doesn't overwrite the button-click message (which includes attribution).
+    params.ctx.clearExecApprovalPending?.(approvalId);
   } catch (err) {
     await respondEphemeral(params.respond, `Failed to submit approval: ${String(err)}`);
     return true;

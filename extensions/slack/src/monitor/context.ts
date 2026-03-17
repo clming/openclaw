@@ -60,6 +60,9 @@ export type SlackMonitorContext = {
   mediaMaxBytes: number;
   removeAckAfterReply: boolean;
 
+  /** Clear a pending exec approval so the gateway echo becomes a no-op. */
+  clearExecApprovalPending?: (approvalId: string) => void;
+
   logger: ReturnType<typeof getChildLogger>;
   markMessageSeen: (channelId: string | undefined, ts?: string) => boolean;
   shouldDropMismatchedSlackEvent: (body: unknown) => boolean;

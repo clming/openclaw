@@ -45,7 +45,6 @@ type SlackApprovalTarget = {
 };
 
 export type SlackExecApprovalHandlerOpts = {
-  botToken: string;
   accountId: string;
   cfg: OpenClawConfig;
   client: WebClient;
@@ -223,6 +222,15 @@ export class SlackExecApprovalHandler {
     deps: SlackExecApprovalHandlerDeps = {},
   ) {
     this.nowMs = deps.nowMs ?? Date.now;
+  }
+
+  /** Remove a pending approval so the gateway echo becomes a no-op. */
+  clearPending(approvalId: string): void {
+    const pending = this.pending.get(approvalId);
+    if (pending) {
+      clearTimeout(pending.timeoutId);
+      this.pending.delete(approvalId);
+    }
   }
 
   shouldHandle(request: ExecApprovalRequest): boolean {

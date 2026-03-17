@@ -315,7 +315,6 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
   }
 
   const execApprovalsHandler = new SlackExecApprovalHandler({
-    botToken,
     accountId: account.accountId,
     cfg,
     client: app.client,
@@ -357,6 +356,8 @@ export async function monitorSlackProvider(opts: MonitorSlackOpts = {}) {
     mediaMaxBytes,
     removeAckAfterReply,
   });
+
+  ctx.clearExecApprovalPending = (approvalId) => execApprovalsHandler.clearPending(approvalId);
 
   // Wire up event liveness tracking: update lastEventAt on every inbound event
   // so the health monitor can detect "half-dead" sockets that pass health checks
