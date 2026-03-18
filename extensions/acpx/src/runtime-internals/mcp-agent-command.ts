@@ -67,7 +67,7 @@ async function loadAgentOverrides(params: {
   const result = await spawnAndCollect(
     {
       command: params.acpxCommand,
-      args: ["--cwd", params.cwd, "config", "show"],
+      args: ["--cd", params.cwd, "config", "show"],
       cwd: params.cwd,
     },
     params.spawnOptions,
