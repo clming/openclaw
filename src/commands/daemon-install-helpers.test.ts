@@ -2,14 +2,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { writeStateDirDotEnv } from "../config/test-helpers.js";
 
 const mocks = vi.hoisted(() => ({
+  loadAuthProfileStoreForSecretsRuntime: vi.fn(),
   resolvePreferredNodePath: vi.fn(),
   resolveGatewayProgramArguments: vi.fn(),
   resolveSystemNodeInfo: vi.fn(),
   renderSystemNodeWarning: vi.fn(),
   buildServiceEnvironment: vi.fn(),
+}));
+
+vi.mock("../agents/auth-profiles.js", () => ({
+  loadAuthProfileStoreForSecretsRuntime: mocks.loadAuthProfileStoreForSecretsRuntime,
 }));
 
 vi.mock("../daemon/runtime-paths.js", () => ({
@@ -32,8 +36,15 @@ import {
   resolveGatewayDevMode,
 } from "./daemon-install-helpers.js";
 
+let stateDirForTest: string | undefined;
+
 afterEach(() => {
   vi.resetAllMocks();
+  delete process.env.OPENCLAW_STATE_DIR;
+  if (stateDirForTest) {
+    fs.rmSync(stateDirForTest, { recursive: true, force: true });
+    stateDirForTest = undefined;
+  }
 });
 
 describe("resolveGatewayDevMode", () => {
@@ -66,6 +77,10 @@ function mockNodeGatewayPlanFixture(
   mocks.resolveGatewayProgramArguments.mockResolvedValue({
     programArguments: ["node", "gateway"],
     workingDirectory,
+  });
+  mocks.loadAuthProfileStoreForSecretsRuntime.mockReturnValue({
+    version: 1,
+    profiles: {},
   });
   mocks.resolveSystemNodeInfo.mockResolvedValue({
     path: "/opt/node",
@@ -154,11 +169,34 @@ describe("buildGatewayInstallPlan", () => {
         OPENCLAW_PORT: "3000",
       },
     });
+    stateDirForTest = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-state-"));
+    process.env.OPENCLAW_STATE_DIR = stateDirForTest;
+    fs.writeFileSync(
+      path.join(stateDirForTest, ".env"),
+      "OPENAI_API_KEY=openai-test-value\nANTHROPIC_TOKEN=anthropic-test-value\n",
+      "utf8",
+    );
+    mocks.loadAuthProfileStoreForSecretsRuntime.mockReturnValue({
+      version: 1,
+      profiles: {
+        "openai:default": {
+          type: "api_key",
+          provider: "openai",
+          keyRef: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
+        },
+        "anthropic:default": {
+          type: "token",
+          provider: "anthropic",
+          tokenRef: { source: "env", provider: "default", id: "ANTHROPIC_TOKEN" },
+        },
+      },
+    });
 
     const plan = await buildGatewayInstallPlan({
       env: {
-        OPENAI_API_KEY: "sk-openai-test", // pragma: allowlist secret
-        ANTHROPIC_TOKEN: "ant-test-token",
+        OPENCLAW_STATE_DIR: stateDirForTest,
+        OPENAI_API_KEY: "openai-test-value",
+        ANTHROPIC_TOKEN: "anthropic-test-value",
       },
       port: 3000,
       runtime: "node",
@@ -167,85 +205,36 @@ describe("buildGatewayInstallPlan", () => {
     expect(plan.environment.OPENAI_API_KEY).toBeUndefined();
     expect(plan.environment.ANTHROPIC_TOKEN).toBeUndefined();
   });
-});
 
-describe("buildGatewayInstallPlan — dotenv merge", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "oc-plan-dotenv-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("merges .env file vars into the install plan", async () => {
-    await writeStateDirDotEnv("BRAVE_API_KEY=BSA-from-env\nOPENROUTER_API_KEY=or-key\n", {
-      stateDir: path.join(tmpDir, ".openclaw"),
+  it("keeps shell-only env-backed auth-profile refs in the service environment", async () => {
+    mockNodeGatewayPlanFixture({
+      serviceEnvironment: {
+        OPENCLAW_PORT: "3000",
+      },
     });
-    mockNodeGatewayPlanFixture({ serviceEnvironment: { OPENCLAW_PORT: "3000" } });
-
-    const plan = await buildGatewayInstallPlan({
-      env: { HOME: tmpDir },
-      port: 3000,
-      runtime: "node",
-    });
-
-    expect(plan.environment.BRAVE_API_KEY).toBe("BSA-from-env");
-    expect(plan.environment.OPENROUTER_API_KEY).toBe("or-key");
-    expect(plan.environment.OPENCLAW_PORT).toBe("3000");
-  });
-
-  it("config env vars override .env file vars", async () => {
-    await writeStateDirDotEnv("MY_KEY=from-dotenv\n", {
-      stateDir: path.join(tmpDir, ".openclaw"),
-    });
-    mockNodeGatewayPlanFixture({ serviceEnvironment: {} });
-
-    const plan = await buildGatewayInstallPlan({
-      env: { HOME: tmpDir },
-      port: 3000,
-      runtime: "node",
-      config: {
-        env: {
-          vars: {
-            MY_KEY: "from-config",
-          },
+    stateDirForTest = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-state-"));
+    process.env.OPENCLAW_STATE_DIR = stateDirForTest;
+    mocks.loadAuthProfileStoreForSecretsRuntime.mockReturnValue({
+      version: 1,
+      profiles: {
+        "openai:default": {
+          type: "api_key",
+          provider: "openai",
+          keyRef: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
         },
       },
     });
 
-    expect(plan.environment.MY_KEY).toBe("from-config");
-  });
-
-  it("service env overrides .env file vars", async () => {
-    await writeStateDirDotEnv("HOME=/from-dotenv\n", {
-      stateDir: path.join(tmpDir, ".openclaw"),
-    });
-    mockNodeGatewayPlanFixture({
-      serviceEnvironment: { HOME: "/from-service" },
-    });
-
     const plan = await buildGatewayInstallPlan({
-      env: { HOME: tmpDir },
+      env: {
+        OPENCLAW_STATE_DIR: stateDirForTest,
+        OPENAI_API_KEY: "openai-test-value",
+      },
       port: 3000,
       runtime: "node",
     });
 
-    expect(plan.environment.HOME).toBe("/from-service");
-  });
-
-  it("works when .env file does not exist", async () => {
-    mockNodeGatewayPlanFixture({ serviceEnvironment: { OPENCLAW_PORT: "3000" } });
-
-    const plan = await buildGatewayInstallPlan({
-      env: { HOME: tmpDir },
-      port: 3000,
-      runtime: "node",
-    });
-
-    expect(plan.environment.OPENCLAW_PORT).toBe("3000");
+    expect(plan.environment.OPENAI_API_KEY).toBe("openai-test-value");
   });
 });
 
