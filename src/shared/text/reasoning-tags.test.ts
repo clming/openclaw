@@ -192,12 +192,30 @@ describe("stripReasoningTagsFromText", () => {
     it("applies strict and preserve modes to unclosed tags", () => {
       const input = "Before <think>unclosed content after";
       const cases = [
-        { mode: "strict" as const, expected: "Before" },
+        { mode: "strict" as const, expected: "Before unclosed content after" },
         { mode: "preserve" as const, expected: "Before unclosed content after" },
       ];
       for (const { mode, expected } of cases) {
         expect(stripReasoningTagsFromText(input, { mode })).toBe(expected);
       }
+    });
+
+    it("recovers answer text when trailing unclosed <think> has no content after it", () => {
+      const input = "<think>blah</think> answer text <think>";
+      expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe("answer text");
+    });
+
+    it("recovers content after unclosed second think block in strict mode", () => {
+      const input = "<think>blah</think><think>answer text";
+      expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe("answer text");
+      expect(stripReasoningTagsFromText(input, { mode: "preserve" })).toBe("answer text");
+    });
+
+    it("recovers content when entire reply is inside unclosed think block", () => {
+      const input = "<think>this is my complete answer without closing tag";
+      expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe(
+        "this is my complete answer without closing tag",
+      );
     });
 
     it("still strips fully closed reasoning blocks in preserve mode", () => {
