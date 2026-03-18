@@ -168,6 +168,7 @@ export const matrixPlugin: ChannelPlugin<ResolvedMatrixAccount> = {
         cfg: cfg as CoreConfig,
         providerConfigPresent: (cfg as CoreConfig).channels?.matrix !== undefined,
         configuredGroupPolicy: account.config.groupPolicy,
+        normalizeMembers: true,
         collect: (groupPolicy) =>
           groupPolicy === "open"
             ? [

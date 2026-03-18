@@ -140,6 +140,7 @@ export const nextcloudTalkPlugin: ChannelPlugin<ResolvedNextcloudTalkAccount> = 
         providerConfigPresent:
           (cfg.channels as Record<string, unknown> | undefined)?.["nextcloud-talk"] !== undefined,
         configuredGroupPolicy: account.config.groupPolicy,
+        normalizeMembers: true,
         collect: (groupPolicy) =>
           collectOpenGroupPolicyRouteAllowlistWarnings({
             groupPolicy,

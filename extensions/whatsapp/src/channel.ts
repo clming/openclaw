@@ -141,6 +141,7 @@ export const whatsappPlugin: ChannelPlugin<ResolvedWhatsAppAccount> = {
         cfg,
         providerConfigPresent: cfg.channels?.whatsapp !== undefined,
         configuredGroupPolicy: account.groupPolicy,
+        normalizeMembers: true,
         collect: (groupPolicy) =>
           collectOpenGroupPolicyRouteAllowlistWarnings({
             groupPolicy,

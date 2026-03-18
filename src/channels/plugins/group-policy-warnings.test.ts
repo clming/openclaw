@@ -189,6 +189,40 @@ describe("group policy warning builders", () => {
     ).toEqual(["disabled"]);
   });
 
+  it("normalizes 'members' to 'open' in open-provider warnings (non-Telegram)", () => {
+    expect(
+      collectOpenProviderGroupPolicyWarnings({
+        cfg: {},
+        providerConfigPresent: true,
+        configuredGroupPolicy: "members",
+        collect: (groupPolicy) => [groupPolicy],
+      }),
+    ).toEqual(["open"]);
+  });
+
+  it("normalizes 'members' to 'open' in allowlist-provider warnings when normalizeMembers is set", () => {
+    expect(
+      collectAllowlistProviderGroupPolicyWarnings({
+        cfg: {},
+        providerConfigPresent: true,
+        configuredGroupPolicy: "members",
+        normalizeMembers: true,
+        collect: (groupPolicy) => [groupPolicy],
+      }),
+    ).toEqual(["open"]);
+  });
+
+  it("preserves 'members' in allowlist-provider warnings without normalizeMembers (Telegram)", () => {
+    expect(
+      collectAllowlistProviderGroupPolicyWarnings({
+        cfg: {},
+        providerConfigPresent: true,
+        configuredGroupPolicy: "members",
+        collect: (groupPolicy) => [groupPolicy],
+      }),
+    ).toEqual(["members"]);
+  });
+
   it("collects route allowlist warning variants", () => {
     const params = {
       groupPolicy: "open" as const,

@@ -186,6 +186,7 @@ export const googlechatPlugin: ChannelPlugin<ResolvedGoogleChatAccount> = {
         cfg,
         providerConfigPresent: cfg.channels?.googlechat !== undefined,
         configuredGroupPolicy: account.config.groupPolicy,
+        normalizeMembers: true,
         collect: (groupPolicy) =>
           groupPolicy === "open"
             ? [

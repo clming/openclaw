@@ -147,6 +147,7 @@ export const ircPlugin: ChannelPlugin<ResolvedIrcAccount, IrcProbe> = {
         cfg,
         providerConfigPresent: cfg.channels?.irc !== undefined,
         configuredGroupPolicy: account.config.groupPolicy,
+        normalizeMembers: true,
         collect: (groupPolicy) =>
           groupPolicy === "open"
             ? [

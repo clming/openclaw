@@ -102,6 +102,12 @@ export function collectAllowlistProviderGroupPolicyWarnings(params: {
   providerConfigPresent: boolean;
   configuredGroupPolicy?: GroupPolicy | null;
   collect: GroupPolicyWarningCollector;
+  /**
+   * When true, normalize "members" to "open" before calling collect.
+   * Use for non-Telegram channels where "members" is not supported and
+   * behaves as "open" at runtime.
+   */
+  normalizeMembers?: boolean;
 }): string[] {
   const defaultGroupPolicy = resolveDefaultGroupPolicy(params.cfg);
   const { groupPolicy } = resolveAllowlistProviderRuntimeGroupPolicy({
@@ -109,7 +115,10 @@ export function collectAllowlistProviderGroupPolicyWarnings(params: {
     groupPolicy: params.configuredGroupPolicy ?? undefined,
     defaultGroupPolicy,
   });
-  return params.collect(groupPolicy);
+  const effective = params.normalizeMembers
+    ? normalizeNonTelegramGroupPolicy(groupPolicy)
+    : groupPolicy;
+  return params.collect(effective);
 }
 
 export function collectOpenProviderGroupPolicyWarnings(params: {
@@ -124,7 +133,8 @@ export function collectOpenProviderGroupPolicyWarnings(params: {
     groupPolicy: params.configuredGroupPolicy ?? undefined,
     defaultGroupPolicy,
   });
-  return params.collect(groupPolicy);
+  // "members" is Telegram-only; non-Telegram callers should treat it as "open" for warnings
+  return params.collect(normalizeNonTelegramGroupPolicy(groupPolicy));
 }
 
 export function collectOpenGroupPolicyRouteAllowlistWarnings(params: {
