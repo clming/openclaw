@@ -36,53 +36,55 @@ window.__copyMermaid = (btn: HTMLElement) => {
   );
 };
 
-// Global mermaid handlers - use event delegation
-document.addEventListener("click", (e) => {
-  const target = e.target as HTMLElement;
+// Global mermaid handlers - use event delegation (browser only)
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  document.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
 
-  // Handle copy button click
-  const copyBtn = target.closest(".mermaid-copy");
-  if (copyBtn) {
-    window.__copyMermaid?.(copyBtn as HTMLButtonElement);
-    return;
-  }
+    // Handle copy button click
+    const copyBtn = target.closest(".mermaid-copy");
+    if (copyBtn) {
+      window.__copyMermaid?.(copyBtn as HTMLButtonElement);
+      return;
+    }
 
-  // Handle fullscreen click
-  const container = target.closest(".mermaid-container");
-  if (!container) {
-    return;
-  }
-  const svg = container.querySelector("svg");
-  if (!svg) {
-    return;
-  }
+    // Handle fullscreen click
+    const container = target.closest(".mermaid-container");
+    if (!container) {
+      return;
+    }
+    const svg = container.querySelector("svg");
+    if (!svg) {
+      return;
+    }
 
-  // Create fullscreen container
-  let fullscreenContainer = document.querySelector(".mermaid-fullscreen") as HTMLDivElement;
-  if (!fullscreenContainer) {
-    fullscreenContainer = document.createElement("div");
-    fullscreenContainer.className = "mermaid-fullscreen";
-    fullscreenContainer.addEventListener("click", () => {
-      fullscreenContainer.classList.remove("active");
-    });
-    document.body.appendChild(fullscreenContainer);
-  }
+    // Create fullscreen container
+    let fullscreenContainer = document.querySelector(".mermaid-fullscreen") as HTMLDivElement;
+    if (!fullscreenContainer) {
+      fullscreenContainer = document.createElement("div");
+      fullscreenContainer.className = "mermaid-fullscreen";
+      fullscreenContainer.addEventListener("click", () => {
+        fullscreenContainer.classList.remove("active");
+      });
+      document.body.appendChild(fullscreenContainer);
+    }
 
-  // Clone and append SVG
-  fullscreenContainer.innerHTML = "";
-  const clonedSvg = svg.cloneNode(true) as SVGElement;
-  clonedSvg.style.background = "white";
-  clonedSvg.style.borderRadius = "8px";
-  fullscreenContainer.appendChild(clonedSvg);
+    // Clone and append SVG
+    fullscreenContainer.innerHTML = "";
+    const clonedSvg = svg.cloneNode(true) as SVGElement;
+    clonedSvg.style.background = "white";
+    clonedSvg.style.borderRadius = "8px";
+    fullscreenContainer.appendChild(clonedSvg);
 
-  // Add hint text without re-serializing SVG
-  const hint = document.createElement("span");
-  hint.className = "mermaid-fullscreen-hint";
-  hint.textContent = "点击任意位置关闭";
-  fullscreenContainer.appendChild(hint);
+    // Add hint text without re-serializing SVG
+    const hint = document.createElement("span");
+    hint.className = "mermaid-fullscreen-hint";
+    hint.textContent = "点击任意位置关闭";
+    fullscreenContainer.appendChild(hint);
 
-  fullscreenContainer.classList.add("active");
-});
+    fullscreenContainer.classList.add("active");
+  });
+}
 
 const allowedTags = [
   "a",
