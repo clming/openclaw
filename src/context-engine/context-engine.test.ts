@@ -5,6 +5,7 @@ import { compactEmbeddedPiSessionDirect } from "../agents/pi-embedded-runner/com
 // We dynamically import the registry so we can get a fresh module per test
 // group when needed.  For most groups we use the shared singleton directly.
 // ---------------------------------------------------------------------------
+import { delegateCompactionToRuntime } from "./delegate.js";
 import { LegacyContextEngine, registerLegacyContextEngine } from "./legacy.js";
 import {
   registerContextEngine,
@@ -237,57 +238,6 @@ describe("Engine contract tests", () => {
     expect(engine.info.id).toBe("mock");
   });
 
-  it("ingest() returns IngestResult with ingested boolean", async () => {
-    const engine = new MockContextEngine();
-    const result = await engine.ingest({
-      sessionId: "s1",
-      message: makeMockMessage(),
-    });
-
-    expect(result).toHaveProperty("ingested");
-    expect(typeof result.ingested).toBe("boolean");
-    expect(result.ingested).toBe(true);
-  });
-
-  it("assemble() returns AssembleResult with messages array and estimatedTokens", async () => {
-    const engine = new MockContextEngine();
-    const msgs = [makeMockMessage(), makeMockMessage("assistant", "world")];
-    const result = await engine.assemble({
-      sessionId: "s1",
-      messages: msgs,
-    });
-
-    expect(Array.isArray(result.messages)).toBe(true);
-    expect(result.messages).toHaveLength(2);
-    expect(typeof result.estimatedTokens).toBe("number");
-    expect(result.estimatedTokens).toBe(42);
-    expect(result.systemPromptAddition).toBe("mock system addition");
-  });
-
-  it("compact() returns CompactResult with ok, compacted, reason, result fields", async () => {
-    const engine = new MockContextEngine();
-    const result = await engine.compact({
-      sessionId: "s1",
-      sessionFile: "/tmp/session.json",
-    });
-
-    expect(typeof result.ok).toBe("boolean");
-    expect(typeof result.compacted).toBe("boolean");
-    expect(result.ok).toBe(true);
-    expect(result.compacted).toBe(true);
-    expect(result.reason).toBe("mock compaction");
-    expect(result.result).toBeDefined();
-    expect(result.result!.summary).toBe("mock summary");
-    expect(result.result!.tokensBefore).toBe(100);
-    expect(result.result!.tokensAfter).toBe(50);
-  });
-
-  it("dispose() is callable (optional method)", async () => {
-    const engine = new MockContextEngine();
-    // Should complete without error
-    await expect(engine.dispose()).resolves.toBeUndefined();
-  });
-
   it("legacy compact preserves runtimeContext currentTokenCount when top-level value is absent", async () => {
     const engine = new LegacyContextEngine();
 
@@ -306,6 +256,40 @@ describe("Engine contract tests", () => {
       }),
     );
   });
+
+  it("delegateCompactionToRuntime reuses the legacy runtime bridge", async () => {
+    const result = await delegateCompactionToRuntime({
+      sessionId: "s2",
+      sessionFile: "/tmp/session.json",
+      tokenBudget: 4096,
+      runtimeContext: {
+        workspaceDir: "/tmp/workspace",
+        currentTokenCount: 12345,
+      },
+    });
+
+    expect(mockedCompactEmbeddedPiSessionDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "s2",
+        sessionFile: "/tmp/session.json",
+        tokenBudget: 4096,
+        currentTokenCount: 12345,
+        workspaceDir: "/tmp/workspace",
+      }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      compacted: false,
+      reason: "mock compaction",
+      result: {
+        summary: "",
+        firstKeptEntryId: "",
+        tokensBefore: 0,
+        tokensAfter: 0,
+        details: undefined,
+      },
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -313,14 +297,7 @@ describe("Engine contract tests", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Registry tests", () => {
-  it("registerContextEngine() stores a factory", () => {
-    const factory = () => new MockContextEngine();
-    registerContextEngine("reg-test-1", factory);
-
-    expect(getContextEngineFactory("reg-test-1")).toBe(factory);
-  });
-
-  it("getContextEngineFactory() returns the factory", () => {
+  it("registerContextEngine() stores retrievable factories", () => {
     const factory = () => new MockContextEngine();
     registerContextEngine("reg-test-2", factory);
 
@@ -567,13 +544,7 @@ describe("Default engine selection", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Invalid engine fallback", () => {
-  it("resolveContextEngine() with config pointing to unregistered engine throws with helpful error", async () => {
-    await expect(resolveContextEngine(configWithSlot("nonexistent-engine"))).rejects.toThrow(
-      /nonexistent-engine/,
-    );
-  });
-
-  it("error message includes the requested id and available ids", async () => {
+  it("includes the requested id and available ids in unknown-engine errors", async () => {
     // Ensure at least legacy is registered so we see it in the available list
     registerLegacyContextEngine();
 
@@ -639,16 +610,11 @@ describe("LegacyContextEngine parity", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("Initialization guard", () => {
-  it("ensureContextEnginesInitialized() is idempotent (calling twice does not throw)", async () => {
+  it("ensureContextEnginesInitialized() is idempotent and registers legacy", async () => {
     const { ensureContextEnginesInitialized } = await import("./init.js");
 
     expect(() => ensureContextEnginesInitialized()).not.toThrow();
     expect(() => ensureContextEnginesInitialized()).not.toThrow();
-  });
-
-  it("after init, 'legacy' engine is registered", async () => {
-    const { ensureContextEnginesInitialized } = await import("./init.js");
-    ensureContextEnginesInitialized();
 
     const ids = listContextEngineIds();
     expect(ids).toContain("legacy");
