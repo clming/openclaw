@@ -1,29 +1,25 @@
 import { Type } from "@sinclair/typebox";
-import { readNumberParam, readStringParam } from "../../../src/agents/tools/common.js";
-import type { SearchConfigRecord } from "../../../src/agents/tools/web-search-provider-common.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
   MAX_SEARCH_COUNT,
   readCachedSearchPayload,
   readConfiguredSecretString,
+  readNumberParam,
   readProviderEnvValue,
+  readStringParam,
+  resolveProviderWebSearchPluginConfig,
   resolveSearchCacheTtlMs,
   resolveSearchCount,
   resolveSearchTimeoutSeconds,
-  withTrustedWebSearchEndpoint,
-  writeCachedSearchPayload,
-} from "../../../src/agents/tools/web-search-provider-common.js";
-import {
-  resolveProviderWebSearchPluginConfig,
   setProviderWebSearchPluginConfigValue,
-} from "../../../src/agents/tools/web-search-provider-config.js";
-import type { OpenClawConfig } from "../../../src/config/config.js";
-import type {
-  WebSearchProviderPlugin,
-  WebSearchProviderToolDefinition,
-} from "../../../src/plugins/types.js";
-import { wrapWebContent } from "../../../src/security/external-content.js";
+  type SearchConfigRecord,
+  type WebSearchProviderPlugin,
+  type WebSearchProviderToolDefinition,
+  withTrustedWebSearchEndpoint,
+  wrapWebContent,
+  writeCachedSearchPayload,
+} from "openclaw/plugin-sdk/provider-web-search";
 
 const DEFAULT_KIMI_BASE_URL = "https://api.moonshot.ai/v1";
 const DEFAULT_KIMI_MODEL = "moonshot-v1-128k";
@@ -66,18 +62,14 @@ type KimiSearchResponse = {
   }>;
 };
 
-function resolveKimiConfig(config?: OpenClawConfig, searchConfig?: SearchConfigRecord): KimiConfig {
-  const pluginConfig = resolveProviderWebSearchPluginConfig(config, "moonshot");
-  if (pluginConfig) {
-    return pluginConfig as KimiConfig;
-  }
-  const kimi = (searchConfig as Record<string, unknown> | undefined)?.kimi;
+function resolveKimiConfig(searchConfig?: SearchConfigRecord): KimiConfig {
+  const kimi = searchConfig?.kimi;
   return kimi && typeof kimi === "object" && !Array.isArray(kimi) ? (kimi as KimiConfig) : {};
 }
 
 function resolveKimiApiKey(kimi?: KimiConfig): string | undefined {
   return (
-    readConfiguredSecretString(kimi?.apiKey, "plugins.entries.moonshot.config.webSearch.apiKey") ??
+    readConfiguredSecretString(kimi?.apiKey, "tools.web.search.kimi.apiKey") ??
     readProviderEnvValue(["KIMI_API_KEY", "MOONSHOT_API_KEY"])
   );
 }
@@ -246,7 +238,6 @@ function createKimiSchema() {
 }
 
 function createKimiToolDefinition(
-  config?: OpenClawConfig,
   searchConfig?: SearchConfigRecord,
 ): WebSearchProviderToolDefinition {
   return {
@@ -273,13 +264,13 @@ function createKimiToolDefinition(
         }
       }
 
-      const kimiConfig = resolveKimiConfig(config, searchConfig);
+      const kimiConfig = resolveKimiConfig(searchConfig);
       const apiKey = resolveKimiApiKey(kimiConfig);
       if (!apiKey) {
         return {
           error: "missing_kimi_api_key",
           message:
-            "web_search (kimi) needs a Moonshot API key. Set KIMI_API_KEY or MOONSHOT_API_KEY in the Gateway environment, or configure plugins.entries.moonshot.config.webSearch.apiKey.",
+            "web_search (kimi) needs a Moonshot API key. Set KIMI_API_KEY or MOONSHOT_API_KEY in the Gateway environment, or configure tools.web.search.kimi.apiKey.",
           docs: "https://docs.openclaw.ai/tools/web",
         };
       }
@@ -363,7 +354,22 @@ export function createKimiWebSearchProvider(): WebSearchProviderPlugin {
       setProviderWebSearchPluginConfigValue(configTarget, "moonshot", "apiKey", value);
     },
     createTool: (ctx) =>
-      createKimiToolDefinition(ctx.config, ctx.searchConfig as SearchConfigRecord | undefined),
+      createKimiToolDefinition(
+        (() => {
+          const searchConfig = ctx.searchConfig as SearchConfigRecord | undefined;
+          const pluginConfig = resolveProviderWebSearchPluginConfig(ctx.config, "moonshot");
+          if (!pluginConfig) {
+            return searchConfig;
+          }
+          return {
+            ...(searchConfig ?? {}),
+            kimi: {
+              ...resolveKimiConfig(searchConfig),
+              ...pluginConfig,
+            },
+          } as SearchConfigRecord;
+        })(),
+      ),
   };
 }
 

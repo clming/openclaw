@@ -1,29 +1,25 @@
 import { Type } from "@sinclair/typebox";
-import { readNumberParam, readStringParam } from "../../../src/agents/tools/common.js";
-import type { SearchConfigRecord } from "../../../src/agents/tools/web-search-provider-common.js";
 import {
   buildSearchCacheKey,
   DEFAULT_SEARCH_COUNT,
   MAX_SEARCH_COUNT,
   readCachedSearchPayload,
   readConfiguredSecretString,
+  readNumberParam,
   readProviderEnvValue,
+  readStringParam,
+  resolveProviderWebSearchPluginConfig,
   resolveSearchCacheTtlMs,
   resolveSearchCount,
   resolveSearchTimeoutSeconds,
-  withTrustedWebSearchEndpoint,
-  writeCachedSearchPayload,
-} from "../../../src/agents/tools/web-search-provider-common.js";
-import {
-  resolveProviderWebSearchPluginConfig,
   setProviderWebSearchPluginConfigValue,
-} from "../../../src/agents/tools/web-search-provider-config.js";
-import type { OpenClawConfig } from "../../../src/config/config.js";
-import type {
-  WebSearchProviderPlugin,
-  WebSearchProviderToolDefinition,
-} from "../../../src/plugins/types.js";
-import { wrapWebContent } from "../../../src/security/external-content.js";
+  type SearchConfigRecord,
+  type WebSearchProviderPlugin,
+  type WebSearchProviderToolDefinition,
+  withTrustedWebSearchEndpoint,
+  wrapWebContent,
+  writeCachedSearchPayload,
+} from "openclaw/plugin-sdk/provider-web-search";
 
 const XAI_API_ENDPOINT = "https://api.x.ai/v1/responses";
 const DEFAULT_GROK_MODEL = "grok-4-1-fast";
@@ -65,18 +61,14 @@ type GrokSearchResponse = {
   }>;
 };
 
-function resolveGrokConfig(config?: OpenClawConfig, searchConfig?: SearchConfigRecord): GrokConfig {
-  const pluginConfig = resolveProviderWebSearchPluginConfig(config, "xai");
-  if (pluginConfig) {
-    return pluginConfig as GrokConfig;
-  }
-  const grok = (searchConfig as Record<string, unknown> | undefined)?.grok;
+function resolveGrokConfig(searchConfig?: SearchConfigRecord): GrokConfig {
+  const grok = searchConfig?.grok;
   return grok && typeof grok === "object" && !Array.isArray(grok) ? (grok as GrokConfig) : {};
 }
 
 function resolveGrokApiKey(grok?: GrokConfig): string | undefined {
   return (
-    readConfiguredSecretString(grok?.apiKey, "plugins.entries.xai.config.webSearch.apiKey") ??
+    readConfiguredSecretString(grok?.apiKey, "tools.web.search.grok.apiKey") ??
     readProviderEnvValue(["XAI_API_KEY"])
   );
 }
@@ -188,7 +180,6 @@ function createGrokSchema() {
 }
 
 function createGrokToolDefinition(
-  config?: OpenClawConfig,
   searchConfig?: SearchConfigRecord,
 ): WebSearchProviderToolDefinition {
   return {
@@ -215,13 +206,13 @@ function createGrokToolDefinition(
         }
       }
 
-      const grokConfig = resolveGrokConfig(config, searchConfig);
+      const grokConfig = resolveGrokConfig(searchConfig);
       const apiKey = resolveGrokApiKey(grokConfig);
       if (!apiKey) {
         return {
           error: "missing_xai_api_key",
           message:
-            "web_search (grok) needs an xAI API key. Set XAI_API_KEY in the Gateway environment, or configure plugins.entries.xai.config.webSearch.apiKey.",
+            "web_search (grok) needs an xAI API key. Set XAI_API_KEY in the Gateway environment, or configure tools.web.search.grok.apiKey.",
           docs: "https://docs.openclaw.ai/tools/web",
         };
       }
@@ -306,7 +297,22 @@ export function createGrokWebSearchProvider(): WebSearchProviderPlugin {
       setProviderWebSearchPluginConfigValue(configTarget, "xai", "apiKey", value);
     },
     createTool: (ctx) =>
-      createGrokToolDefinition(ctx.config, ctx.searchConfig as SearchConfigRecord | undefined),
+      createGrokToolDefinition(
+        (() => {
+          const searchConfig = ctx.searchConfig as SearchConfigRecord | undefined;
+          const pluginConfig = resolveProviderWebSearchPluginConfig(ctx.config, "xai");
+          if (!pluginConfig) {
+            return searchConfig;
+          }
+          return {
+            ...(searchConfig ?? {}),
+            grok: {
+              ...resolveGrokConfig(searchConfig),
+              ...pluginConfig,
+            },
+          } as SearchConfigRecord;
+        })(),
+      ),
   };
 }
 

@@ -1,4 +1,4 @@
-import { definePluginEntry } from "openclaw/plugin-sdk/core";
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { normalizeProviderId } from "openclaw/plugin-sdk/provider-models";
 import {
   createBedrockNoCacheWrapper,
