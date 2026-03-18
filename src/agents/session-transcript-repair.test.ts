@@ -167,7 +167,7 @@ describe("sanitizeToolUseResultPairing", () => {
     expect(assistantContent.every((b: { type: string }) => b.type !== "toolCall")).toBe(true);
     expect(result.messages[1]?.role).toBe("user");
     expect(result.messages).toHaveLength(2);
-    expect(result.changed).toBe(true);
+    expect(result.moved).toBe(true);
   });
 
   it("strips tool_use blocks from assistant messages with stopReason 'aborted'", () => {
@@ -190,7 +190,7 @@ describe("sanitizeToolUseResultPairing", () => {
     const assistantContent = (result.messages[0] as { content: { type: string }[] }).content;
     expect(assistantContent.every((b: { type: string }) => b.type !== "toolCall")).toBe(true);
     expect(result.messages[1]?.role).toBe("user");
-    expect(result.changed).toBe(true);
+    expect(result.moved).toBe(true);
   });
 
   it("preserves text content alongside stripped tool_use in error messages", () => {
@@ -210,7 +210,8 @@ describe("sanitizeToolUseResultPairing", () => {
 
     const result = repairToolUseResultPairing(input);
 
-    const assistantContent = (result.messages[0] as { content: { type: string; text?: string }[] }).content;
+    const assistantContent = (result.messages[0] as { content: { type: string; text?: string }[] })
+      .content;
     expect(assistantContent).toHaveLength(1);
     expect(assistantContent[0]?.type).toBe("text");
     expect(assistantContent[0]?.text).toBe("Let me try running that...");
