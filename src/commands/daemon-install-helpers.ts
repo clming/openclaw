@@ -1,10 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import dotenv from "dotenv";
 import {
   loadAuthProfileStoreForSecretsRuntime,
   type AuthProfileStore,
 } from "../agents/auth-profiles.js";
 import { formatCliCommand } from "../cli/command-format.js";
-import { collectDurableServiceEnvVars } from "../config/state-dir-dotenv.js";
-import type { OpenClawConfig } from "../config/types.js";
+import { resolveStateDir } from "../config/paths.js";
 import { resolveGatewayLaunchAgentLabel } from "../daemon/constants.js";
 import { resolveGatewayProgramArguments } from "../daemon/program-args.js";
 import { buildServiceEnvironment } from "../daemon/service-env.js";
@@ -24,9 +26,20 @@ export type GatewayInstallPlan = {
   environment: Record<string, string | undefined>;
 };
 
+function readDurableStateEnvKeys(env: Record<string, string | undefined>): Set<string> {
+  const envPath = path.join(resolveStateDir(env as NodeJS.ProcessEnv), ".env");
+  try {
+    const parsed = dotenv.parse(fs.readFileSync(envPath, "utf8"));
+    return new Set(Object.keys(parsed));
+  } catch {
+    return new Set();
+  }
+}
+
 function collectAuthProfileServiceEnvVars(params: {
   env: Record<string, string | undefined>;
   authStore?: AuthProfileStore;
+  skipKeys?: Set<string>;
 }): Record<string, string> {
   const authStore = params.authStore ?? loadAuthProfileStoreForSecretsRuntime();
   const entries: Record<string, string> = {};
@@ -38,7 +51,7 @@ function collectAuthProfileServiceEnvVars(params: {
         : credential.type === "token"
           ? credential.tokenRef
           : undefined;
-    if (!ref || ref.source !== "env") {
+    if (!ref || ref.source !== "env" || params.skipKeys?.has(ref.id)) {
       continue;
     }
     const value = params.env[ref.id]?.trim();
@@ -51,26 +64,6 @@ function collectAuthProfileServiceEnvVars(params: {
   return entries;
 }
 
-function buildGatewayInstallEnvironment(params: {
-  env: Record<string, string | undefined>;
-  config?: OpenClawConfig;
-  authStore?: AuthProfileStore;
-  serviceEnvironment: Record<string, string | undefined>;
-}): Record<string, string | undefined> {
-  const environment: Record<string, string | undefined> = {
-    ...collectDurableServiceEnvVars({
-      env: params.env,
-      config: params.config,
-    }),
-    ...collectAuthProfileServiceEnvVars({
-      env: params.env,
-      authStore: params.authStore,
-    }),
-  };
-  Object.assign(environment, params.serviceEnvironment);
-  return environment;
-}
-
 export async function buildGatewayInstallPlan(params: {
   env: Record<string, string | undefined>;
   port: number;
@@ -78,8 +71,6 @@ export async function buildGatewayInstallPlan(params: {
   devMode?: boolean;
   nodePath?: string;
   warn?: DaemonInstallWarnFn;
-  /** Full config to extract env vars from (env vars + inline env keys). */
-  config?: OpenClawConfig;
   authStore?: AuthProfileStore;
 }): Promise<GatewayInstallPlan> {
   const { devMode, nodePath } = await resolveDaemonInstallRuntimeInputs({
@@ -112,22 +103,17 @@ export async function buildGatewayInstallPlan(params: {
     // a version-manager bin directory that isn't covered by static PATH guesses.
     extraPathDirs: resolveDaemonNodeBinDir(nodePath),
   });
-
-  // Merge env sources into the service environment in ascending priority:
-  //   1. ~/.openclaw/.env file vars  (lowest — user secrets / fallback keys)
-  //   2. Config env vars              (openclaw.json env.vars + inline keys)
-  //   3. Auth-profile env refs        (credential store → env var lookups)
-  //   4. Service environment          (HOME, PATH, OPENCLAW_* — highest)
-  return {
-    programArguments,
-    workingDirectory,
-    environment: buildGatewayInstallEnvironment({
+  // Avoid duplicating secrets that already live in the durable state-dir `.env`,
+  // while still preserving shell-only env refs for daemon installs.
+  const environment = {
+    ...collectAuthProfileServiceEnvVars({
       env: params.env,
-      config: params.config,
       authStore: params.authStore,
-      serviceEnvironment,
+      skipKeys: readDurableStateEnvKeys(params.env),
     }),
+    ...serviceEnvironment,
   };
+  return { programArguments, workingDirectory, environment };
 }
 
 export function gatewayInstallErrorHint(platform = process.platform): string {
