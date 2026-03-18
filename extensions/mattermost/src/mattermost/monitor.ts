@@ -1437,10 +1437,13 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
         await new Promise<void>((r) => setTimeout(r, 20));
       }
       const rawText = pendingPatchText;
-      if (!rawText || rawText === lastSentText) return;
+      if (!rawText) return;
       // Truncate to textLimit so intermediate patches never exceed the server limit.
       // Final delivery applies full chunking; streaming posts only need the first chunk.
       const text = rawText.length > textLimit ? rawText.slice(0, textLimit) : rawText;
+      // Guard on the truncated text so long replies (past textLimit) do not keep
+      // re-patching with the same truncated content every 200 ms and hit rate limits.
+      if (text === lastSentText) return;
       if (!streamMessageId) {
         try {
           const result = await sendMessageMattermost(to, text, {
@@ -1448,7 +1451,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             replyToId: effectiveReplyToId,
           });
           streamMessageId = result.messageId;
-          lastSentText = rawText;
+          lastSentText = text;
           runtime.log?.(`stream-patch started ${streamMessageId}`);
         } catch (err) {
           logVerboseMessage(`mattermost stream-patch flush send failed: ${String(err)}`);
@@ -1459,7 +1462,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             postId: streamMessageId,
             message: text,
           });
-          lastSentText = rawText;
+          lastSentText = text;
           runtime.log?.(`stream-patch flushed ${streamMessageId}`);
         } catch (err) {
           logVerboseMessage(`mattermost stream-patch flush failed: ${String(err)}`);
@@ -1473,9 +1476,12 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
       if (patchInterval) return;
       patchInterval = setInterval(() => {
         const rawText = pendingPatchText;
-        if (!rawText || rawText === lastSentText || patchSending) return;
+        if (!rawText || patchSending) return;
         // Truncate to textLimit so intermediate patches never exceed the server limit.
         const text = rawText.length > textLimit ? rawText.slice(0, textLimit) : rawText;
+        // Guard on the truncated text so long replies (past textLimit) do not keep
+        // re-patching with the same truncated content every 200 ms and hit rate limits.
+        if (text === lastSentText) return;
         patchSending = true;
         void (async () => {
           try {
@@ -1486,7 +1492,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
                   replyToId: effectiveReplyToId,
                 });
                 streamMessageId = result.messageId;
-                lastSentText = rawText;
+                lastSentText = text;
                 runtime.log?.(`stream-patch started ${streamMessageId}`);
               } catch (err) {
                 logVerboseMessage(`mattermost stream-patch send failed: ${String(err)}`);
@@ -1497,7 +1503,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
                   postId: streamMessageId,
                   message: text,
                 });
-                lastSentText = rawText;
+                lastSentText = text;
                 runtime.log?.(`stream-patch edited ${streamMessageId}`);
               } catch (err) {
                 logVerboseMessage(`mattermost stream-patch edit failed: ${String(err)}`);
@@ -1550,11 +1556,10 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
               );
               const orphanId = streamMessageId;
               streamMessageId = null;
-              try {
-                await deleteMattermostPost(blockStreamingClient!, orphanId);
-              } catch {
-                // Ignore delete failure — delivering the complete message takes priority
-              }
+              // Deliver the fallback message first. Only delete the orphaned
+              // stream post after we know the replacement was successfully sent —
+              // if delivery also fails the user keeps the partial preview rather
+              // than losing all visible output.
               await deliverMattermostReplyPayload({
                 core,
                 cfg,
@@ -1570,6 +1575,12 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
                 tableMode,
                 sendMessage: sendMessageMattermost,
               });
+              // Fallback succeeded — now clean up the orphaned partial.
+              try {
+                await deleteMattermostPost(blockStreamingClient!, orphanId);
+              } catch {
+                // Ignore — the complete message was already delivered.
+              }
               return;
             }
             // Successful final patch: reset all streaming state.
