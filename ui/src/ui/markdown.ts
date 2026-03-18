@@ -13,13 +13,13 @@ mermaid.initialize({
 // Extend Window interface for mermaid copy handler
 declare global {
   interface Window {
-    __copyMermaid?: (encodedCode: string, btn: HTMLElement) => void;
+    __copyMermaid?: (btn: HTMLElement) => void;
   }
 }
 
-// Global mermaid copy handler (called from inline onclick)
-window.__copyMermaid = (encodedCode: string, btn: HTMLElement) => {
-  const code = decodeURIComponent(encodedCode);
+// Global mermaid copy handler (uses event delegation via click on .mermaid-copy)
+window.__copyMermaid = (btn: HTMLElement) => {
+  const code = btn.dataset.code ?? "";
   navigator.clipboard.writeText(code).then(
     () => {
       // Show feedback
@@ -36,9 +36,19 @@ window.__copyMermaid = (encodedCode: string, btn: HTMLElement) => {
   );
 };
 
-// Global mermaid fullscreen handler - use event delegation
+// Global mermaid handlers - use event delegation
 document.addEventListener("click", (e) => {
-  const container = (e.target as HTMLElement).closest(".mermaid-container");
+  const target = e.target as HTMLElement;
+
+  // Handle copy button click
+  const copyBtn = target.closest(".mermaid-copy");
+  if (copyBtn) {
+    window.__copyMermaid?.(copyBtn as HTMLButtonElement);
+    return;
+  }
+
+  // Handle fullscreen click
+  const container = target.closest(".mermaid-container");
   if (!container) {
     return;
   }
@@ -52,7 +62,6 @@ document.addEventListener("click", (e) => {
   if (!fullscreenContainer) {
     fullscreenContainer = document.createElement("div");
     fullscreenContainer.className = "mermaid-fullscreen";
-    fullscreenContainer.innerHTML = `<span class="mermaid-fullscreen-hint">点击任意位置关闭</span>`;
     fullscreenContainer.addEventListener("click", () => {
       fullscreenContainer.classList.remove("active");
     });
@@ -65,9 +74,14 @@ document.addEventListener("click", (e) => {
   clonedSvg.style.background = "white";
   clonedSvg.style.borderRadius = "8px";
   fullscreenContainer.appendChild(clonedSvg);
-  fullscreenContainer.innerHTML += `<span class="mermaid-fullscreen-hint">点击任意位置关闭</span>`;
+
+  // Add hint text without re-serializing SVG
+  const hint = document.createElement("span");
+  hint.className = "mermaid-fullscreen-hint";
+  hint.textContent = "点击任意位置关闭";
+  fullscreenContainer.appendChild(hint);
+
   fullscreenContainer.classList.add("active");
-  console.log("[mermaid-fullscreen] opened");
 });
 
 const allowedTags = [
@@ -116,7 +130,6 @@ const allowedAttrs = [
   "data-code",
   "type",
   "aria-label",
-  "onclick",
 ];
 const sanitizeOptions = {
   ALLOWED_TAGS: allowedTags,
@@ -258,9 +271,7 @@ htmlEscapeRenderer.code = ({
     const trimmed = text.trim();
     const escapedCode = escapeHtml(trimmed);
     // Create enhanced container with source code and copy button
-    // Use encodeURIComponent to safely pass the code in onclick
-    const encodedCode = encodeURIComponent(trimmed);
-    const copyBtn = `<button type="button" class="mermaid-copy" data-code="${escapedCode}" onclick="window.__copyMermaid && window.__copyMermaid('${encodedCode}', this)" aria-label="Copy mermaid code">
+    const copyBtn = `<button type="button" class="mermaid-copy" data-code="${escapedCode}" aria-label="Copy mermaid code">
       <span class="copy-icon">📋</span>
     </button>`;
     const header = `<div class="mermaid-header">
@@ -347,7 +358,7 @@ export async function renderMermaidInContainer(container: HTMLElement): Promise<
       element.innerHTML = svg;
     } catch (err) {
       console.error("[mermaid] render failed:", err);
-      element.innerHTML = `<span class="mermaid-error">Mermaid 渲染失败: ${String(err)}</span>`;
+      element.innerHTML = `<span class="mermaid-error">Mermaid 渲染失败: ${escapeHtml(String(err))}</span>`;
     }
   }
 }
