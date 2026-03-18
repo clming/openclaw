@@ -291,6 +291,18 @@ export class SlackExecApprovalHandler {
       return;
     }
 
+    // In multi-account setups, skip if the request is explicitly from a
+    // different Slack account to avoid duplicate prompts / info leakage.
+    const turnSourceChannel = request.request.turnSourceChannel?.trim().toLowerCase();
+    const turnSourceAccountId = request.request.turnSourceAccountId?.trim();
+    if (
+      turnSourceChannel === "slack" &&
+      turnSourceAccountId &&
+      normalizeAccountId(turnSourceAccountId) !== normalizeAccountId(this.opts.accountId)
+    ) {
+      return;
+    }
+
     const targetMode = resolveSlackExecApprovalTarget({
       cfg: this.opts.cfg,
       accountId: this.opts.accountId,
@@ -378,7 +390,25 @@ export class SlackExecApprovalHandler {
           ...(target.threadTs ? { thread_ts: target.threadTs } : {}),
         });
         if (result.ts) {
-          pendingEntry.messages.push({ channelId, ts: result.ts });
+          // If the pending entry was cleared during the await (concurrent resolve),
+          // immediately update this stale message to remove buttons.
+          if (!this.pending.has(request.id)) {
+            await this.opts.client.chat
+              .update({
+                channel: channelId,
+                ts: result.ts,
+                text: "Exec approval resolved.",
+                blocks: [
+                  {
+                    type: "section",
+                    text: { type: "mrkdwn", text: ":white_check_mark: Exec approval resolved." },
+                  },
+                ],
+              })
+              .catch(() => {});
+          } else {
+            pendingEntry.messages.push({ channelId, ts: result.ts });
+          }
         }
       } catch (err) {
         log.error(`slack exec approvals: failed to send request ${request.id}: ${String(err)}`);
