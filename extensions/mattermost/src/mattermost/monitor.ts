@@ -1424,9 +1424,17 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     const flushPendingPatch = async () => {
       stopPatchInterval();
       if (!blockStreamingClient) return;
+      // Wait for any in-flight interval tick to settle before flushing.
+      // Without this, an interval tick that set lastSentText synchronously but hasn't
+      // completed the async send yet would cause flushPendingPatch to exit early
+      // (text === lastSentText guard), leaving streamMessageId null and causing
+      // final delivery to fall through to a new post instead of patching in place.
+      const deadline = Date.now() + 2000;
+      while (patchSending && Date.now() < deadline) {
+        await new Promise<void>((r) => setTimeout(r, 20));
+      }
       const text = pendingPatchText;
       if (!text || text === lastSentText) return;
-      lastSentText = text;
       if (!streamMessageId) {
         try {
           const result = await sendMessageMattermost(to, text, {
@@ -1434,6 +1442,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             replyToId: effectiveReplyToId,
           });
           streamMessageId = result.messageId;
+          lastSentText = text;
           runtime.log?.(`stream-patch started ${streamMessageId}`);
         } catch (err) {
           logVerboseMessage(`mattermost stream-patch flush send failed: ${String(err)}`);
@@ -1444,6 +1453,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             postId: streamMessageId,
             message: text,
           });
+          lastSentText = text;
           runtime.log?.(`stream-patch flushed ${streamMessageId}`);
         } catch (err) {
           logVerboseMessage(`mattermost stream-patch flush failed: ${String(err)}`);
@@ -1458,7 +1468,6 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
       patchInterval = setInterval(() => {
         const text = pendingPatchText;
         if (!text || text === lastSentText || patchSending) return;
-        lastSentText = text;
         patchSending = true;
         void (async () => {
           try {
@@ -1469,6 +1478,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
                   replyToId: effectiveReplyToId,
                 });
                 streamMessageId = result.messageId;
+                lastSentText = text;
                 runtime.log?.(`stream-patch started ${streamMessageId}`);
               } catch (err) {
                 logVerboseMessage(`mattermost stream-patch send failed: ${String(err)}`);
@@ -1479,6 +1489,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
                   postId: streamMessageId,
                   message: text,
                 });
+                lastSentText = text;
                 runtime.log?.(`stream-patch edited ${streamMessageId}`);
               } catch (err) {
                 logVerboseMessage(`mattermost stream-patch edit failed: ${String(err)}`);
@@ -1543,7 +1554,11 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
               });
               return;
             }
+            // Successful final patch: reset all streaming state.
             streamMessageId = null;
+            pendingPatchText = "";
+            lastSentText = "";
+            patchSending = false;
             return;
           }
 
