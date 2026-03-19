@@ -183,6 +183,9 @@ export function filterToolResultMediaUrls(
     // an exact raw-name match. This prevents MCP/client tools from bypassing
     // the local-path filter via aliases (bash -> exec), case variants, or
     // other normalized-name collisions with trusted built-ins.
+    // NOTE: when builtinToolNames is omitted (undefined), the guard is skipped
+    // and the weaker normalized-name check applies. All production call paths
+    // (attempt.ts) supply this set; omitting it preserves legacy behavior only.
     if (builtinToolNames !== undefined) {
       const registeredName = toolName?.trim();
       if (!registeredName || !builtinToolNames.has(registeredName)) {

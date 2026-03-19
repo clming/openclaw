@@ -1595,6 +1595,8 @@ export async function runEmbeddedAttempt(
     // Collect exact raw names of non-plugin OpenClaw tools. Passed to the
     // subscriber so filterToolResultMediaUrls only trusts MEDIA: paths from
     // the concrete built-in tool registrations for this run.
+    // Built from `tools` (not `effectiveTools`) so bundle-injected MCP/LSP
+    // tools are deliberately excluded and never receive local-path trust.
     const builtinToolNames = new Set(
       tools.flatMap((tool) => {
         const name = tool.name.trim();
@@ -1609,6 +1611,10 @@ export async function runEmbeddedAttempt(
       existingToolNames: builtinToolNames,
     });
     if (clientToolNameConflicts.length > 0) {
+      // Dispose runtimes before throwing — the inner try/finally that normally
+      // handles disposal hasn't been entered yet at this point.
+      await bundleMcpRuntime?.dispose();
+      await bundleLspRuntime?.dispose();
       throw createClientToolNameConflictError(clientToolNameConflicts);
     }
     await params.onPreflightPassed?.();
