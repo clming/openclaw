@@ -451,7 +451,23 @@ export function createOpenAICompatContentNormalizationWrapper(
   };
 }
 
-type ContentBlock = { type?: string; text?: string };
+/**
+ * Return true when a content block is a plain `{type:"text", text:"..."}` with
+ * no extra annotation properties (e.g. `cache_control`).  Blocks that carry
+ * additional metadata must remain as objects so providers that need those
+ * annotations (like OpenRouter Anthropic caching) are not broken.
+ */
+function isPlainTextBlock(block: unknown): block is { type: "text"; text: string } {
+  if (!block || typeof block !== "object") {
+    return false;
+  }
+  const keys = Object.keys(block);
+  if (keys.length !== 2) {
+    return false;
+  }
+  const rec = block as Record<string, unknown>;
+  return rec.type === "text" && typeof rec.text === "string";
+}
 
 /**
  * Walk the `messages` array in an OpenAI Chat Completions payload and
@@ -469,20 +485,17 @@ function normalizeOpenAICompatMessageContent(payload: Record<string, unknown>): 
       continue;
     }
 
-    // Only flatten when every block is a text block.
-    const blocks = content as ContentBlock[];
-    if (blocks.length === 0) {
+    // Only flatten when every block is a plain text block with no extra
+    // annotation properties (e.g. cache_control added by OpenRouter).
+    if (content.length === 0) {
       continue;
     }
-    const allText = blocks.every(
-      (block) => block && typeof block === "object" && block.type === "text",
-    );
-    if (!allText) {
+    if (!content.every(isPlainTextBlock)) {
       continue;
     }
 
     // Concatenate text parts into a single string, matching the standard
     // OpenAI Chat Completions format.
-    msg.content = blocks.map((block) => block.text ?? "").join("");
+    msg.content = (content as Array<{ text: string }>).map((block) => block.text).join("");
   }
 }

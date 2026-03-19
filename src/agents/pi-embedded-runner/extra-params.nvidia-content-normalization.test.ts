@@ -197,6 +197,22 @@ describe("extra-params: OpenAI-compat content normalization (#50107)", () => {
     expect(payload.messages[0].content).toEqual([{ type: "text", text: "Hello" }]);
   });
 
+  it("preserves text blocks with cache_control annotations", () => {
+    // OpenRouter Anthropic caching adds cache_control to text blocks.
+    // These must NOT be flattened or the caching annotation is lost.
+    const annotatedContent = [
+      { type: "text", text: "Hello", cache_control: { type: "ephemeral" } },
+    ];
+    const payload = captureWrapperDirect({
+      api: "openai-completions",
+      provider: "openrouter",
+      modelId: "anthropic/claude-3.5-sonnet",
+      messages: [{ role: "user", content: annotatedContent }],
+    });
+
+    expect(payload.messages[0].content).toEqual(annotatedContent);
+  });
+
   it("handles empty content arrays gracefully", () => {
     const payload = capturePayload({
       provider: "nvidia",
