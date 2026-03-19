@@ -51,6 +51,7 @@ function normalizeHostnameSet(values?: string[]): Set<string> {
 }
 
 // Returns `null` when not configured (allow all), `[]` when explicit empty (deny all).
+// Non-empty input where every entry is invalid (e.g. ["*"]) also returns [] (fail closed).
 function normalizeHostnameAllowlist(values?: string[]): string[] | null {
   if (values === undefined || values === null) {
     return null;
@@ -58,6 +59,9 @@ function normalizeHostnameAllowlist(values?: string[]): string[] | null {
   if (values.length === 0) {
     return [];
   }
+  // Bare "*" and "*." are not valid hostname patterns (they would only match a literal
+  // "*" hostname in isHostnameAllowedByPattern). Strip them so operators who mistakenly
+  // configure ["*"] get a clear deny-all rather than a silent pass-through.
   return Array.from(
     new Set(
       values
