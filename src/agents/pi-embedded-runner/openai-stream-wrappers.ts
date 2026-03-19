@@ -422,10 +422,12 @@ export function createOpenAIAttributionHeadersWrapper(
  * LiteLLM, etc.) reject it with HTTP 400 because they only accept the
  * standard `"content": "string"` format for text-only messages.
  *
- * This wrapper normalizes the outbound payload via `onPayload` so every user
- * (and system/developer) message whose content is an array of exclusively
- * `{type:"text"}` blocks becomes a simple concatenated string.  Messages that
- * contain non-text blocks (e.g. `image_url`) are left untouched.
+ * This wrapper normalizes the outbound payload via `onPayload` so every
+ * message (user, system, developer, assistant) whose content is an array of
+ * exclusively plain `{type:"text", text:"..."}` blocks (no extra properties
+ * like `cache_control`) becomes a simple concatenated string.  Messages that
+ * contain non-text blocks (e.g. `image_url`) or annotated text blocks are
+ * left untouched.
  */
 export function createOpenAICompatContentNormalizationWrapper(
   baseStreamFn: StreamFn | undefined,
