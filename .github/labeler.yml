@@ -229,6 +229,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/device-pair/**"
+"extensions: strava":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/strava/**"
 "extensions: acpx":
   - changed-files:
       - any-glob-to-any-file:
