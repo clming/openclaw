@@ -86,8 +86,29 @@ export function formatChatModelDisplay(value: string): string {
 
 export function buildChatModelOption(entry: ModelCatalogEntry): { value: string; label: string } {
   const provider = entry.provider?.trim();
-  return {
-    value: buildQualifiedChatModelValue(entry.id, provider),
-    label: provider ? `${entry.id} · ${provider}` : entry.id,
-  };
+  const id = entry.id?.trim() ?? "";
+
+  // When the provider field is populated, qualify as provider/id.
+  if (provider) {
+    return {
+      value: buildQualifiedChatModelValue(id, provider),
+      label: `${id} · ${provider}`,
+    };
+  }
+
+  // Provider is missing — if the id already contains a slash it is
+  // self-qualified (e.g. "xai/grok-4-1-fast"). Use it as-is and derive
+  // display values from the embedded prefix.
+  const slash = id.indexOf("/");
+  if (slash > 0) {
+    const embeddedProvider = id.slice(0, slash);
+    const modelName = id.slice(slash + 1);
+    return {
+      value: id,
+      label: `${modelName} · ${embeddedProvider}`,
+    };
+  }
+
+  // No provider and no embedded prefix — return the bare id.
+  return { value: id, label: id };
 }
