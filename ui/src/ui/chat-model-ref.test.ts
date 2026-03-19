@@ -123,5 +123,14 @@ describe("chat-model-ref helpers", () => {
         "openrouter/anthropic/claude-sonnet-4-5",
       );
     });
+
+    it("does not double-prefix when model id already starts with provider", () => {
+      expect(buildQualifiedChatModelValue("openrouter/hunter-alpha", "openrouter")).toBe(
+        "openrouter/hunter-alpha",
+      );
+      expect(buildQualifiedChatModelValue("nvidia/nemotron-3-nano", "nvidia")).toBe(
+        "nvidia/nemotron-3-nano",
+      );
+    });
   });
 });
