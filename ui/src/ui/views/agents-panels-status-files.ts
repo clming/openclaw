@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { html, nothing } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { marked } from "marked";
+import { handleCodeBlockCopyClick } from "../code-block-copy.ts";
 import { formatRelativeTimestamp } from "../format.ts";
 import { icons } from "../icons.ts";
 import {
@@ -537,7 +538,7 @@ export function renderAgentFiles(params: {
                                 >${icons.x} Close</button>
                               </div>
                             </div>
-                            <div class="md-preview-dialog__body">
+                            <div class="md-preview-dialog__body" @click=${handleCodeBlockCopyClick}>
                               ${unsafeHTML(applyPreviewTheme(marked.parse(draft, { gfm: true, breaks: true }) as string, { sanitize: (h: string) => DOMPurify.sanitize(h) }))}
                             </div>
                           </div>
