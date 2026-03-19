@@ -149,6 +149,32 @@ import {
   composeSystemPromptWithHookContext,
   resolveAttemptSpawnWorkspaceDir,
 } from "./attempt.thread-helpers.js";
+
+/**
+ * Wrap a pi-agent-core Agent with the `hasPendingToolCalls` hint expected by
+ * `flushPendingToolResultsAfterIdle`.  pi-agent-core tracks in-flight tool
+ * calls via `agent.state.pendingToolCalls` (a `Set<string>`) but does not
+ * expose a dedicated method.  This adapter bridges the two so the flush loop
+ * can detect retry gaps where `waitForIdle` transiently resolves while tools
+ * are still executing.
+ */
+function withPendingToolCallsHint(
+  agent:
+    | { state?: { pendingToolCalls?: Set<string> }; waitForIdle?: () => Promise<void> }
+    | null
+    | undefined,
+) {
+  if (!agent) {
+    return agent;
+  }
+  return {
+    waitForIdle: agent.waitForIdle?.bind(agent),
+    hasPendingToolCalls: () => {
+      const pending = agent.state?.pendingToolCalls;
+      return pending instanceof Set && pending.size > 0;
+    },
+  };
+}
 import { waitForCompactionRetryWithAggregateTimeout } from "./compaction-retry-aggregate-timeout.js";
 import {
   resolveRunTimeoutDuringCompaction,
@@ -2486,7 +2512,7 @@ export async function runEmbeddedAttempt(
         }
       } catch (err) {
         await flushPendingToolResultsAfterIdle({
-          agent: activeSession?.agent,
+          agent: withPendingToolCallsHint(activeSession?.agent),
           sessionManager,
           clearPendingOnTimeout: true,
         });
@@ -3196,7 +3222,7 @@ export async function runEmbeddedAttempt(
       // See: https://github.com/openclaw/openclaw/issues/8643
       removeToolResultContextGuard?.();
       await flushPendingToolResultsAfterIdle({
-        agent: session?.agent,
+        agent: withPendingToolCallsHint(session?.agent),
         sessionManager,
         clearPendingOnTimeout: true,
       });
