@@ -411,3 +411,78 @@ export function createOpenAIAttributionHeadersWrapper(
     });
   };
 }
+
+/**
+ * Flatten text-only content arrays in user messages to plain strings.
+ *
+ * pi-ai's `convertMessages` emits user messages whose content is an array of
+ * `{type:"text", text:"..."}` objects when the internal representation uses
+ * Anthropic-style content blocks.  Native OpenAI endpoints tolerate this, but
+ * many third-party OpenAI-compatible providers (NVIDIA NIM, Ollama, vLLM,
+ * LiteLLM, etc.) reject it with HTTP 400 because they only accept the
+ * standard `"content": "string"` format for text-only messages.
+ *
+ * This wrapper normalizes the outbound payload via `onPayload` so every user
+ * (and system/developer) message whose content is an array of exclusively
+ * `{type:"text"}` blocks becomes a simple concatenated string.  Messages that
+ * contain non-text blocks (e.g. `image_url`) are left untouched.
+ */
+export function createOpenAICompatContentNormalizationWrapper(
+  baseStreamFn: StreamFn | undefined,
+): StreamFn {
+  const underlying = baseStreamFn ?? streamSimple;
+  return (model, context, options) => {
+    // Only apply to openai-completions (the Chat Completions adapter path).
+    // Responses API and Anthropic endpoints use different payload shapes.
+    if (model.api !== "openai-completions") {
+      return underlying(model, context, options);
+    }
+
+    const originalOnPayload = options?.onPayload;
+    return underlying(model, context, {
+      ...options,
+      onPayload: (payload) => {
+        if (payload && typeof payload === "object") {
+          normalizeOpenAICompatMessageContent(payload as Record<string, unknown>);
+        }
+        return originalOnPayload?.(payload, model);
+      },
+    });
+  };
+}
+
+type ContentBlock = { type?: string; text?: string };
+
+/**
+ * Walk the `messages` array in an OpenAI Chat Completions payload and
+ * flatten any text-only content arrays to plain strings.
+ */
+function normalizeOpenAICompatMessageContent(payload: Record<string, unknown>): void {
+  const messages = payload.messages;
+  if (!Array.isArray(messages)) {
+    return;
+  }
+
+  for (const msg of messages as Array<{ role?: string; content?: unknown }>) {
+    const content = msg.content;
+    if (!Array.isArray(content)) {
+      continue;
+    }
+
+    // Only flatten when every block is a text block.
+    const blocks = content as ContentBlock[];
+    if (blocks.length === 0) {
+      continue;
+    }
+    const allText = blocks.every(
+      (block) => block && typeof block === "object" && block.type === "text",
+    );
+    if (!allText) {
+      continue;
+    }
+
+    // Concatenate text parts into a single string, matching the standard
+    // OpenAI Chat Completions format.
+    msg.content = blocks.map((block) => block.text ?? "").join("");
+  }
+}
