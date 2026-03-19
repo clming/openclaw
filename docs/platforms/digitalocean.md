@@ -80,7 +80,7 @@ openclaw --version
 ## 4) Run Onboarding
 
 ```bash
-openclaw setup --wizard --install-daemon
+openclaw onboard --install-daemon
 ```
 
 The wizard will walk you through:
@@ -231,7 +231,7 @@ For the full setup guide, see [Oracle Cloud](/platforms/oracle). For signup tips
 
 ## Troubleshooting
 
-### Gateway won't start
+### Gateway will not start
 
 ```bash
 openclaw gateway status

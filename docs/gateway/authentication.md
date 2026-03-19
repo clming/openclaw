@@ -49,8 +49,8 @@ openclaw models status
 openclaw doctor
 ```
 
-If you’d rather not manage env vars yourself, the setup wizard can store
-API keys for daemon use: `openclaw setup --wizard`.
+If you’d rather not manage env vars yourself, onboarding can store
+API keys for daemon use: `openclaw onboard`.
 
 See [Help](/help) for details on env inheritance (`env.shellEnv`,
 `~/.openclaw/.env`, systemd/launchd).
@@ -159,7 +159,7 @@ Use `--agent <id>` to target a specific agent; omit it to use the configured def
 
 ## Troubleshooting
 
-### “No credentials found”
+### "No credentials found"
 
 If the Anthropic token profile is missing, run `claude setup-token` on the
 **gateway host**, then re-check:

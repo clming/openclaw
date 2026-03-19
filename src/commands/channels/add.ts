@@ -11,6 +11,10 @@ import { defaultRuntime, type RuntimeEnv } from "../../runtime.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
 import { applyAgentBindings, describeBinding } from "../agents.bindings.js";
 import { isCatalogChannelInstalled } from "../channel-setup/discovery.js";
+import {
+  createChannelOnboardingPostWriteHookCollector,
+  runCollectedChannelOnboardingPostWriteHooks,
+} from "../onboard-channels.js";
 import type { ChannelChoice } from "../onboard-types.js";
 import { applyAccountName, applyChannelAccountConfig } from "./add-mutators.js";
 import { channelLabel, requireValidConfig, shouldUseWizard } from "./shared.js";
@@ -55,6 +59,7 @@ export async function channelsAddCommand(
       import("../onboard-channels.js"),
     ]);
     const prompter = createClackPrompter();
+    const postWriteHooks = createChannelOnboardingPostWriteHookCollector();
     let selection: ChannelChoice[] = [];
     const accountIds: Partial<Record<ChannelChoice, string>> = {};
     const resolvedPlugins = new Map<ChannelChoice, ChannelSetupPlugin>();
@@ -62,6 +67,9 @@ export async function channelsAddCommand(
     let nextConfig = await setupChannels(cfg, runtime, prompter, {
       allowDisable: false,
       allowSignalInstall: true,
+      onPostWriteHook: (hook) => {
+        postWriteHooks.collect(hook);
+      },
       promptAccountIds: true,
       onSelection: (value) => {
         selection = value;
@@ -170,6 +178,11 @@ export async function channelsAddCommand(
     }
 
     await writeConfigFile(nextConfig);
+    await runCollectedChannelOnboardingPostWriteHooks({
+      hooks: postWriteHooks.drain(),
+      cfg: nextConfig,
+      runtime,
+    });
     await prompter.outro("Channels updated.");
     return;
   }
@@ -312,20 +325,7 @@ export async function channelsAddCommand(
     return;
   }
 
-  let previousTelegramToken = "";
-  let resolveTelegramAccount:
-    | ((
-        params: Parameters<
-          typeof import("../../../extensions/telegram/src/accounts.js").resolveTelegramAccount
-        >[0],
-      ) => ReturnType<
-        typeof import("../../../extensions/telegram/src/accounts.js").resolveTelegramAccount
-      >)
-    | undefined;
-  if (channel === "telegram") {
-    ({ resolveTelegramAccount } = await import("../../../extensions/telegram/src/accounts.js"));
-    previousTelegramToken = resolveTelegramAccount({ cfg: nextConfig, accountId }).token.trim();
-  }
+  const prevConfig = nextConfig;
 
   if (accountId !== DEFAULT_ACCOUNT_ID) {
     nextConfig = moveSingleAccountChannelSectionToDefaultAccount({
@@ -341,17 +341,33 @@ export async function channelsAddCommand(
     input,
     plugin,
   });
-
-  if (channel === "telegram" && resolveTelegramAccount) {
-    const { deleteTelegramUpdateOffset } =
-      await import("../../../extensions/telegram/src/update-offset-store.js");
-    const nextTelegramToken = resolveTelegramAccount({ cfg: nextConfig, accountId }).token.trim();
-    if (previousTelegramToken !== nextTelegramToken) {
-      // Clear stale polling offsets after Telegram token rotation.
-      await deleteTelegramUpdateOffset({ accountId });
-    }
-  }
+  await plugin.lifecycle?.onAccountConfigChanged?.({
+    prevCfg: prevConfig,
+    nextCfg: nextConfig,
+    accountId,
+    runtime,
+  });
 
   await writeConfigFile(nextConfig);
   runtime.log(`Added ${channelLabel(channel)} account "${accountId}".`);
+  if (plugin.setup.afterAccountConfigWritten) {
+    await runCollectedChannelOnboardingPostWriteHooks({
+      hooks: [
+        {
+          channel,
+          accountId,
+          run: async ({ cfg: writtenCfg, runtime: hookRuntime }) =>
+            await plugin.setup.afterAccountConfigWritten?.({
+              previousCfg: cfg,
+              cfg: writtenCfg,
+              accountId,
+              input,
+              runtime: hookRuntime,
+            }),
+        },
+      ],
+      cfg: nextConfig,
+      runtime,
+    });
+  }
 }

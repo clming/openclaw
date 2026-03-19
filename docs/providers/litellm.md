@@ -1,4 +1,5 @@
 ---
+title: "LiteLLM"
 summary: "Run OpenClaw through LiteLLM Proxy for unified model access and cost tracking"
 read_when:
   - You want to route OpenClaw through a LiteLLM proxy
@@ -22,7 +23,7 @@ read_when:
 ### Via onboarding
 
 ```bash
-openclaw setup --wizard --auth-choice litellm-api-key
+openclaw onboard --auth-choice litellm-api-key
 ```
 
 ### Manual setup

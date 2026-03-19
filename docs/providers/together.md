@@ -1,4 +1,5 @@
 ---
+title: "Together AI"
 summary: "Together AI setup (auth + model selection)"
 read_when:
   - You want to use Together AI with OpenClaw
@@ -18,7 +19,7 @@ The [Together AI](https://together.ai) provides access to leading open-source mo
 1. Set the API key (recommended: store it for the Gateway):
 
 ```bash
-openclaw setup --wizard --auth-choice together-api-key
+openclaw onboard --auth-choice together-api-key
 ```
 
 2. Set a default model:
@@ -36,7 +37,7 @@ openclaw setup --wizard --auth-choice together-api-key
 ## Non-interactive example
 
 ```bash
-openclaw setup --wizard --non-interactive \
+openclaw onboard --non-interactive \
   --mode local \
   --auth-choice together-api-key \
   --together-api-key "$TOGETHER_API_KEY"

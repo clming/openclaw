@@ -13,7 +13,7 @@ model as `provider/model`.
 
 ## Quick start (two steps)
 
-1. Authenticate with the provider (usually via `openclaw setup --wizard`).
+1. Authenticate with the provider (usually via `openclaw onboard`).
 2. Set the default model:
 
 ```json5
@@ -39,6 +39,7 @@ model as `provider/model`.
 - [Venice (Venice AI)](/providers/venice)
 - [Amazon Bedrock](/providers/bedrock)
 - [Qianfan](/providers/qianfan)
+- [xAI](/providers/xai)
 
 For the full provider catalog (xAI, Groq, Mistral, etc.) and advanced configuration,
 see [Model providers](/concepts/model-providers).

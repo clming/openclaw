@@ -136,6 +136,54 @@ export function hasInteractiveReplyBlocks(value: unknown): value is InteractiveR
   return Boolean(normalizeInteractiveReply(value));
 }
 
+export function hasReplyChannelData(value: unknown): value is Record<string, unknown> {
+  return Boolean(
+    value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0,
+  );
+}
+
+export function hasReplyContent(params: {
+  text?: string | null;
+  mediaUrl?: string | null;
+  mediaUrls?: ReadonlyArray<string | null | undefined>;
+  interactive?: unknown;
+  hasChannelData?: boolean;
+  extraContent?: boolean;
+}): boolean {
+  return Boolean(
+    params.text?.trim() ||
+    params.mediaUrl?.trim() ||
+    params.mediaUrls?.some((entry) => Boolean(entry?.trim())) ||
+    hasInteractiveReplyBlocks(params.interactive) ||
+    params.hasChannelData ||
+    params.extraContent,
+  );
+}
+
+export function hasReplyPayloadContent(
+  payload: {
+    text?: string | null;
+    mediaUrl?: string | null;
+    mediaUrls?: ReadonlyArray<string | null | undefined>;
+    interactive?: unknown;
+    channelData?: unknown;
+  },
+  options?: {
+    trimText?: boolean;
+    hasChannelData?: boolean;
+    extraContent?: boolean;
+  },
+): boolean {
+  return hasReplyContent({
+    text: options?.trimText ? payload.text?.trim() : payload.text,
+    mediaUrl: payload.mediaUrl,
+    mediaUrls: payload.mediaUrls,
+    interactive: payload.interactive,
+    hasChannelData: options?.hasChannelData ?? hasReplyChannelData(payload.channelData),
+    extraContent: options?.extraContent,
+  });
+}
+
 export function resolveInteractiveTextFallback(params: {
   text?: string;
   interactive?: InteractiveReply;

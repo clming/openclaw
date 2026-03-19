@@ -6,15 +6,17 @@ import {
   readStringParam,
 } from "../../agents/tools/common.js";
 import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
-import { dispatchChannelMessageAction } from "../../channels/plugins/message-actions.js";
+import { getChannelPlugin } from "../../channels/plugins/index.js";
+import { dispatchChannelMessageAction } from "../../channels/plugins/message-action-dispatch.js";
 import type {
   ChannelId,
   ChannelMessageActionName,
   ChannelThreadingToolContext,
 } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { hasInteractiveReplyBlocks, hasReplyPayloadContent } from "../../interactive/payload.js";
 import { getAgentScopedMediaLocalRoots } from "../../media/local-roots.js";
-import { hasPollCreationParams, resolveTelegramPollVisibility } from "../../poll-params.js";
+import { hasPollCreationParams } from "../../poll-params.js";
 import { resolvePollMaxSelections } from "../../polls.js";
 import { buildChannelAccountBindings } from "../../routing/bindings.js";
 import { normalizeAgentId } from "../../routing/session-key.js";
@@ -37,8 +39,6 @@ import {
   parseInteractiveParam,
   readBooleanParam,
   resolveAttachmentMediaPolicy,
-  resolveSlackAutoThreadId,
-  resolveTelegramAutoThreadId,
 } from "./message-action-params.js";
 import type { MessagePollResult, MessageSendResult } from "./message.js";
 import {
@@ -65,22 +65,23 @@ export type MessageActionRunnerGateway = {
 function resolveAndApplyOutboundThreadId(
   params: Record<string, unknown>,
   ctx: {
+    cfg: OpenClawConfig;
     channel: ChannelId;
     to: string;
+    accountId?: string | null;
     toolContext?: ChannelThreadingToolContext;
-    allowSlackAutoThread: boolean;
   },
 ): string | undefined {
   const threadId = readStringParam(params, "threadId");
-  const slackAutoThreadId =
-    ctx.allowSlackAutoThread && ctx.channel === "slack" && !threadId
-      ? resolveSlackAutoThreadId({ to: ctx.to, toolContext: ctx.toolContext })
-      : undefined;
-  const telegramAutoThreadId =
-    ctx.channel === "telegram" && !threadId
-      ? resolveTelegramAutoThreadId({ to: ctx.to, toolContext: ctx.toolContext })
-      : undefined;
-  const resolved = threadId ?? slackAutoThreadId ?? telegramAutoThreadId;
+  const resolved =
+    threadId ??
+    getChannelPlugin(ctx.channel)?.threading?.resolveAutoThreadId?.({
+      cfg: ctx.cfg,
+      accountId: ctx.accountId,
+      to: ctx.to,
+      toolContext: ctx.toolContext,
+      replyToId: readStringParam(params, "replyTo"),
+    });
   // Write auto-resolved threadId back into params so downstream dispatch
   // (plugin `readStringParam(params, "threadId")`) picks it up.
   if (resolved && !params.threadId) {
@@ -95,6 +96,7 @@ export type RunMessageActionParams = {
   params: Record<string, unknown>;
   defaultAccountId?: string;
   requesterSenderId?: string | null;
+  sessionId?: string;
   toolContext?: ChannelThreadingToolContext;
   gateway?: MessageActionRunnerGateway;
   deps?: OutboundSendDeps;
@@ -407,7 +409,7 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
   const hasButtons = Array.isArray(params.buttons) && params.buttons.length > 0;
   const hasCard = params.card != null && typeof params.card === "object";
   const hasComponents = params.components != null && typeof params.components === "object";
-  const hasInteractive = params.interactive != null && typeof params.interactive === "object";
+  const hasInteractive = hasInteractiveReplyBlocks(params.interactive);
   const hasBlocks =
     (Array.isArray(params.blocks) && params.blocks.length > 0) ||
     (typeof params.blocks === "string" && params.blocks.trim().length > 0);
@@ -475,21 +477,18 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
   });
 
   const mediaUrl = readStringParam(params, "media", { trim: false });
-  if (channel === "whatsapp") {
-    message = message.replace(/^(?:[ \t]*\r?\n)+/, "");
-    if (!message.trim()) {
-      message = "";
-    }
-  }
   if (
-    !message.trim() &&
-    !mediaUrl &&
-    mergedMediaUrls.length === 0 &&
-    !hasButtons &&
-    !hasCard &&
-    !hasComponents &&
-    !hasInteractive &&
-    !hasBlocks
+    !hasReplyPayloadContent(
+      {
+        text: message,
+        mediaUrl,
+        mediaUrls: mergedMediaUrls,
+        interactive: params.interactive,
+      },
+      {
+        extraContent: hasButtons || hasCard || hasComponents || hasBlocks,
+      },
+    )
   ) {
     throw new Error("send requires text or media");
   }
@@ -501,10 +500,11 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
 
   const replyToId = readStringParam(params, "replyTo");
   const resolvedThreadId = resolveAndApplyOutboundThreadId(params, {
+    cfg,
     channel,
     to,
+    accountId,
     toolContext: input.toolContext,
-    allowSlackAutoThread: channel === "slack" && !replyToId,
   });
   const outboundRoute =
     agentId && !dryRun
@@ -589,40 +589,14 @@ async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActi
   throwIfAborted(abortSignal);
   const action: ChannelMessageActionName = "poll";
   const to = readStringParam(params, "to", { required: true });
-  const question = readStringParam(params, "pollQuestion", {
-    required: true,
-  });
-  const options = readStringArrayParam(params, "pollOption", { required: true });
-  if (options.length < 2) {
-    throw new Error("pollOption requires at least two values");
-  }
   const silent = readBooleanParam(params, "silent");
-  const allowMultiselect = readBooleanParam(params, "pollMulti") ?? false;
-  const pollAnonymous = readBooleanParam(params, "pollAnonymous");
-  const pollPublic = readBooleanParam(params, "pollPublic");
-  const isAnonymous = resolveTelegramPollVisibility({ pollAnonymous, pollPublic });
-  const durationHours = readNumberParam(params, "pollDurationHours", {
-    integer: true,
-    strict: true,
-  });
-  const durationSeconds = readNumberParam(params, "pollDurationSeconds", {
-    integer: true,
-    strict: true,
-  });
-  const maxSelections = resolvePollMaxSelections(options.length, allowMultiselect);
-
-  if (durationSeconds !== undefined && channel !== "telegram") {
-    throw new Error("pollDurationSeconds is only supported for Telegram polls");
-  }
-  if (isAnonymous !== undefined && channel !== "telegram") {
-    throw new Error("pollAnonymous/pollPublic are only supported for Telegram polls");
-  }
 
   const resolvedThreadId = resolveAndApplyOutboundThreadId(params, {
+    cfg,
     channel,
     to,
+    accountId,
     toolContext: input.toolContext,
-    allowSlackAutoThread: channel === "slack",
   });
 
   const base = typeof params.message === "string" ? params.message : "";
@@ -649,14 +623,29 @@ async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActi
       dryRun,
       silent: silent ?? undefined,
     },
-    to,
-    question,
-    options,
-    maxSelections,
-    durationSeconds: durationSeconds ?? undefined,
-    durationHours: durationHours ?? undefined,
-    threadId: resolvedThreadId ?? undefined,
-    isAnonymous,
+    resolveCorePoll: () => {
+      const question = readStringParam(params, "pollQuestion", {
+        required: true,
+      });
+      const options = readStringArrayParam(params, "pollOption", { required: true });
+      if (options.length < 2) {
+        throw new Error("pollOption requires at least two values");
+      }
+      const allowMultiselect = readBooleanParam(params, "pollMulti") ?? false;
+      const durationHours = readNumberParam(params, "pollDurationHours", {
+        integer: true,
+        strict: true,
+      });
+
+      return {
+        to,
+        question,
+        options,
+        maxSelections: resolvePollMaxSelections(options.length, allowMultiselect),
+        durationHours: durationHours ?? undefined,
+        threadId: resolvedThreadId ?? undefined,
+      };
+    },
   });
 
   return {
@@ -673,7 +662,7 @@ async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActi
 }
 
 async function handlePluginAction(ctx: ResolvedActionContext): Promise<MessageActionRunResult> {
-  const { cfg, params, channel, accountId, dryRun, gateway, input, abortSignal } = ctx;
+  const { cfg, params, channel, accountId, dryRun, gateway, input, abortSignal, agentId } = ctx;
   throwIfAborted(abortSignal);
   const action = input.action as Exclude<ChannelMessageActionName, "send" | "poll" | "broadcast">;
   if (dryRun) {
@@ -699,6 +688,9 @@ async function handlePluginAction(ctx: ResolvedActionContext): Promise<MessageAc
     params,
     accountId: accountId ?? undefined,
     requesterSenderId: input.requesterSenderId ?? undefined,
+    sessionKey: input.sessionKey,
+    sessionId: input.sessionId,
+    agentId,
     gateway,
     toolContext: input.toolContext,
     dryRun,
@@ -834,6 +826,7 @@ export async function runMessageAction(
     dryRun,
     gateway,
     input,
+    agentId: resolvedAgentId,
     abortSignal: input.abortSignal,
   });
 }

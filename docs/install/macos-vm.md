@@ -112,7 +112,7 @@ After setup completes, enable SSH:
 
 ---
 
-## 4) Get the VM's IP address
+## 4) Get the VM IP address
 
 ```bash
 lume get openclaw
@@ -138,7 +138,7 @@ Inside the VM:
 
 ```bash
 npm install -g openclaw@latest
-openclaw setup --wizard --install-daemon
+openclaw onboard --install-daemon
 ```
 
 Follow the onboarding prompts to set up your model provider (Anthropic, OpenAI, etc.).
