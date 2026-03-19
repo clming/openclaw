@@ -121,7 +121,7 @@ openclaw health
 - **Where state lives:**
   - Credentials: `~/.openclaw/credentials/`
   - Sessions: `~/.openclaw/agents/<agentId>/sessions/`
-  - Logs: `/tmp/openclaw/`
+  - Logs: `/tmp/openclaw/` (default; configurable via `logging.dir` or `logging.file`)
 
 ## Credential storage map
 
