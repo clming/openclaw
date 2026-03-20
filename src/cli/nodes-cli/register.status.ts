@@ -127,6 +127,7 @@ function shouldFallbackToPairList(error: unknown): boolean {
   return (
     message.includes("unknown method") ||
     message.includes("method not found") ||
+    message.includes("invalid request") ||
     message.includes("not implemented") ||
     message.includes("unsupported")
   );

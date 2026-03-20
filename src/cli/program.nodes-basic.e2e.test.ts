@@ -182,6 +182,35 @@ describe("cli program (nodes basics)", () => {
     expect(output).toContain("One");
   });
 
+  it("runs nodes list and falls back to node.pair.list on invalid request", async () => {
+    callGateway.mockImplementation(async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { method?: string };
+      if (opts.method === "node.pair.list") {
+        return {
+          pending: [],
+          paired: [
+            {
+              nodeId: "n1",
+              displayName: "One",
+              remoteIp: "10.0.0.1",
+              lastConnectedAtMs: Date.now() - 1_000,
+            },
+          ],
+        };
+      }
+      if (opts.method === "node.list") {
+        throw new Error("invalid request");
+      }
+      return { ok: true };
+    });
+
+    await runProgram(["nodes", "list"]);
+
+    const output = getRuntimeOutput();
+    expect(output).toContain("Pending: 0 · Paired: 1");
+    expect(output).toContain("One");
+  });
+
   it("fails clearly for nodes list --connected when node.list is unavailable", async () => {
     callGateway.mockImplementation(async (...args: unknown[]) => {
       const opts = (args[0] ?? {}) as { method?: string };
