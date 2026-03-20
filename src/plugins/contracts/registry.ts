@@ -6,6 +6,7 @@ import cloudflareAiGatewayPlugin from "../../../extensions/cloudflare-ai-gateway
 import copilotProxyPlugin from "../../../extensions/copilot-proxy/index.js";
 import elevenLabsPlugin from "../../../extensions/elevenlabs/index.js";
 import falPlugin from "../../../extensions/fal/index.js";
+import featherlessPlugin from "../../../extensions/featherless/index.js";
 import githubCopilotPlugin from "../../../extensions/github-copilot/index.js";
 import googlePlugin from "../../../extensions/google/index.js";
 import huggingFacePlugin from "../../../extensions/huggingface/index.js";
@@ -355,6 +356,7 @@ const bundledProviderPlugins = dedupePlugins([
   copilotProxyPlugin,
   githubCopilotPlugin,
   falPlugin,
+  featherlessPlugin,
   googlePlugin,
   huggingFacePlugin,
   kilocodePlugin,
