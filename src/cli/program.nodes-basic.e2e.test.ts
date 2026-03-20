@@ -100,6 +100,82 @@ describe("cli program (nodes basics)", () => {
     expect(output).not.toContain("Two");
   });
 
+  it("runs nodes list and includes paired nodes from node.list when node.pair.list is empty", async () => {
+    const now = Date.now();
+    callGateway.mockImplementation(async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { method?: string };
+      if (opts.method === "node.pair.list") {
+        return {
+          pending: [],
+          paired: [],
+        };
+      }
+      if (opts.method === "node.list") {
+        return {
+          ts: now,
+          nodes: [
+            {
+              nodeId: "n1",
+              displayName: "One",
+              remoteIp: "10.0.0.1",
+              paired: true,
+              connected: true,
+              connectedAtMs: now - 1_000,
+            },
+          ],
+        };
+      }
+      return { ok: true };
+    });
+
+    await runProgram(["nodes", "list"]);
+
+    expect(callGateway).toHaveBeenCalledWith(expect.objectContaining({ method: "node.pair.list" }));
+    expect(callGateway).toHaveBeenCalledWith(expect.objectContaining({ method: "node.list" }));
+
+    const output = getRuntimeOutput();
+    expect(output).toContain("Pending: 0 · Paired: 1");
+    expect(output).toContain("One");
+  });
+
+  it("runs nodes list and falls back to node.pair.list when node.list is unavailable", async () => {
+    callGateway.mockImplementation(async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { method?: string };
+      if (opts.method === "node.pair.list") {
+        return {
+          pending: [],
+          paired: [
+            {
+              nodeId: "n1",
+              displayName: "One",
+              remoteIp: "10.0.0.1",
+              lastConnectedAtMs: Date.now() - 1_000,
+            },
+          ],
+        };
+      }
+      if (opts.method === "node.list") {
+        throw new Error("unknown method: node.list");
+      }
+      return { ok: true };
+    });
+
+    await runProgram(["nodes", "list"]);
+
+    expect(callGateway).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ method: "node.pair.list" }),
+    );
+    expect(callGateway).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ method: "node.list" }),
+    );
+
+    const output = getRuntimeOutput();
+    expect(output).toContain("Pending: 0 · Paired: 1");
+    expect(output).toContain("One");
+  });
+
   it("runs nodes status --last-connected and filters by age", async () => {
     const now = Date.now();
     callGateway.mockImplementation(async (...args: unknown[]) => {
