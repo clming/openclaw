@@ -38,6 +38,12 @@ describe("cli program (nodes basics)", () => {
     await program.parseAsync(argv, { from: "user" });
   }
 
+  async function expectRunProgramFailure(argv: string[], expectedError: RegExp) {
+    runtime.error.mockClear();
+    await expect(program.parseAsync(argv, { from: "user" })).rejects.toThrow(/exit/i);
+    expect(runtime.error.mock.calls.some(([msg]) => expectedError.test(String(msg)))).toBe(true);
+  }
+
   function getRuntimeOutput() {
     return runtime.log.mock.calls.map((c) => formatRuntimeLogCallArg(c[0])).join("\n");
   }
@@ -155,7 +161,7 @@ describe("cli program (nodes basics)", () => {
         };
       }
       if (opts.method === "node.list") {
-        throw new Error("unknown method: node.list");
+        throw new Error("unknown method");
       }
       return { ok: true };
     });
@@ -174,6 +180,71 @@ describe("cli program (nodes basics)", () => {
     const output = getRuntimeOutput();
     expect(output).toContain("Pending: 0 · Paired: 1");
     expect(output).toContain("One");
+  });
+
+  it("fails clearly for nodes list --connected when node.list is unavailable", async () => {
+    callGateway.mockImplementation(async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { method?: string };
+      if (opts.method === "node.pair.list") {
+        return {
+          pending: [],
+          paired: [
+            {
+              nodeId: "n1",
+              displayName: "One",
+              remoteIp: "10.0.0.1",
+              lastConnectedAtMs: Date.now() - 1_000,
+            },
+          ],
+        };
+      }
+      if (opts.method === "node.list") {
+        throw new Error("unknown method");
+      }
+      return { ok: true };
+    });
+
+    await expectRunProgramFailure(
+      ["nodes", "list", "--connected"],
+      /node\.list is unavailable .* require live node data/i,
+    );
+  });
+
+  it("preserves legacy paired metadata in nodes list --json fallback output", async () => {
+    callGateway.mockImplementation(async (...args: unknown[]) => {
+      const opts = (args[0] ?? {}) as { method?: string };
+      if (opts.method === "node.pair.list") {
+        return {
+          pending: [],
+          paired: [
+            {
+              nodeId: "n1",
+              token: "tok-1",
+              displayName: "One",
+              remoteIp: "10.0.0.1",
+              approvedAtMs: 123,
+              createdAtMs: 122,
+            },
+          ],
+        };
+      }
+      if (opts.method === "node.list") {
+        throw new Error("unknown method");
+      }
+      return { ok: true };
+    });
+
+    await runProgram(["nodes", "list", "--json"]);
+
+    const lastLog = runtime.log.mock.calls.at(-1)?.[0];
+    expect(typeof lastLog).toBe("string");
+    const payload = JSON.parse(typeof lastLog === "string" ? lastLog : "") as {
+      paired: Array<Record<string, unknown>>;
+    };
+    expect(payload.paired).toHaveLength(1);
+    expect(payload.paired[0]?.token).toBe("tok-1");
+    expect(payload.paired[0]?.approvedAtMs).toBe(123);
+    expect(payload.paired[0]?.createdAtMs).toBe(122);
   });
 
   it("runs nodes status --last-connected and filters by age", async () => {

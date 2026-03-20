@@ -124,9 +124,6 @@ function messageFromError(error: unknown): string {
 
 function shouldFallbackToPairList(error: unknown): boolean {
   const message = messageFromError(error).toLowerCase();
-  if (!message.includes("node.list")) {
-    return false;
-  }
   return (
     message.includes("unknown method") ||
     message.includes("method not found") ||
@@ -135,9 +132,7 @@ function shouldFallbackToPairList(error: unknown): boolean {
   );
 }
 
-type NodesListEntry = NodeListNode & {
-  lastConnectedAtMs?: number;
-};
+type NodesListEntry = NodeListNode & PairedNode;
 
 function mergePairedNodeSources(params: {
   liveNodes: NodeListNode[] | null;
@@ -147,17 +142,9 @@ function mergePairedNodeSources(params: {
 
   for (const paired of params.pairedNodes) {
     merged.set(paired.nodeId, {
-      nodeId: paired.nodeId,
-      displayName: paired.displayName,
-      platform: paired.platform,
-      version: paired.version,
-      coreVersion: paired.coreVersion,
-      uiVersion: paired.uiVersion,
-      remoteIp: paired.remoteIp,
-      permissions: paired.permissions,
+      ...paired,
       paired: true,
       connected: false,
-      lastConnectedAtMs: paired.lastConnectedAtMs,
     });
   }
 
@@ -189,6 +176,7 @@ function mergePairedNodeSources(params: {
 async function loadPairedNodesForList(opts: NodesRpcOpts): Promise<{
   pending: ReturnType<typeof parsePairingList>["pending"];
   paired: NodesListEntry[];
+  usedFallback: boolean;
 }> {
   const pairingResult = await callGatewayCli("node.pair.list", opts, {});
   const { pending, paired } = parsePairingList(pairingResult);
@@ -197,6 +185,7 @@ async function loadPairedNodesForList(opts: NodesRpcOpts): Promise<{
     return {
       pending,
       paired: mergePairedNodeSources({ liveNodes, pairedNodes: paired }),
+      usedFallback: false,
     };
   } catch (error) {
     if (!shouldFallbackToPairList(error)) {
@@ -205,6 +194,7 @@ async function loadPairedNodesForList(opts: NodesRpcOpts): Promise<{
     return {
       pending,
       paired: mergePairedNodeSources({ liveNodes: null, pairedNodes: paired }),
+      usedFallback: true,
     };
   }
 }
@@ -416,11 +406,16 @@ export function registerNodesStatusCommands(nodes: Command) {
         await runNodesCommand("list", async () => {
           const connectedOnly = Boolean(opts.connected);
           const sinceMs = parseSinceMs(opts.lastConnected, "Invalid --last-connected");
-          const { pending, paired } = await loadPairedNodesForList(opts);
+          const { pending, paired, usedFallback } = await loadPairedNodesForList(opts);
           const { heading, muted, warn } = getNodesTheme();
           const tableWidth = getTerminalTableWidth();
           const now = Date.now();
           const hasFilters = connectedOnly || sinceMs !== undefined;
+          if (usedFallback && hasFilters) {
+            throw new Error(
+              "node.list is unavailable on this gateway; --connected and --last-connected require live node data",
+            );
+          }
           const pendingRows = hasFilters ? [] : pending;
           const filteredPaired = paired.filter((node) => {
             if (connectedOnly) {
