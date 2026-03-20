@@ -95,7 +95,10 @@ export async function sendDiscordComponentMessage(
   const expectedAttachmentName = uniqueAttachmentNames[0];
   let files: MessagePayloadFile[] | undefined;
   if (opts.mediaUrl) {
-    const media = await loadWebMedia(opts.mediaUrl, { localRoots: opts.mediaLocalRoots });
+    const media = await loadWebMedia(opts.mediaUrl, {
+      localRoots: opts.mediaLocalRoots,
+      preserveWebp: true,
+    });
     const filenameOverride = opts.filename?.trim();
     const fileName = filenameOverride || media.fileName || "upload";
     if (expectedAttachmentName && expectedAttachmentName !== fileName) {
@@ -103,7 +106,7 @@ export async function sendDiscordComponentMessage(
         `Component file block expects attachment "${expectedAttachmentName}", but the uploaded file is "${fileName}". Update components.blocks[].file or provide a matching filename.`,
       );
     }
-    const fileData = toDiscordFileBlob(media.buffer);
+    const fileData = toDiscordFileBlob(media.buffer, media.contentType);
     files = [{ data: fileData, name: fileName }];
   } else if (expectedAttachmentName) {
     throw new Error(
