@@ -25,7 +25,9 @@ export default definePluginEntry({
         const providers = config?.models?.providers;
         if (providers) {
           for (const [key, value] of Object.entries(providers)) {
-            if (normalizeProviderId(key) !== PROVIDER_ID) continue;
+            if (normalizeProviderId(key) !== PROVIDER_ID) {
+              continue;
+            }
             const models = (value as { models?: Array<{ id?: string; name?: string }> })?.models;
             const modelDef = models?.find((m) => m.id === modelId);
             if (modelDef?.name) {

@@ -409,7 +409,9 @@ export function isAnthropicBedrockModel(modelId: string, modelName?: string): bo
     normalized.includes(":application-inference-profile/")
   ) {
     const profileId = normalized.split(":application-inference-profile/")[1] ?? "";
-    if (profileId.includes("claude")) return true;
+    if (profileId.includes("claude")) {
+      return true;
+    }
     return modelName ? modelName.toLowerCase().includes("claude") : false;
   }
 
@@ -419,7 +421,9 @@ export function isAnthropicBedrockModel(modelId: string, modelName?: string): bo
   // Note: the regex is intentionally broad; it is safe because standard Bedrock model IDs
   // always contain dots or colons (e.g. "amazon.nova-micro-v1:0") which exclude them here.
   if (looksLikeShortProfileId(normalized)) {
-    if (normalized.includes("claude")) return true;
+    if (normalized.includes("claude")) {
+      return true;
+    }
     return modelName ? modelName.toLowerCase().includes("claude") : false;
   }
 
