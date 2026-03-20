@@ -801,10 +801,6 @@
       "destination": "/install/azure"
     },
     {
-      "source": "/install/azure/azure",
-      "destination": "/install/azure"
-    },
-    {
       "source": "/platforms/fly",
       "destination": "/install/fly"
     },
@@ -952,6 +948,7 @@
                   "channels/telegram",
                   "channels/tlon",
                   "channels/twitch",
+                  "plugins/voice-call",
                   "channels/whatsapp",
                   "channels/zalo",
                   "channels/zalouser"
@@ -1000,7 +997,11 @@
               },
               {
                 "group": "Multi-agent",
-                "pages": ["concepts/multi-agent", "concepts/presence"]
+                "pages": [
+                  "concepts/multi-agent",
+                  "concepts/presence",
+                  "concepts/delegate-architecture"
+                ]
               },
               {
                 "group": "Messages and delivery",
@@ -1073,14 +1074,13 @@
                 ]
               },
               {
-                "group": "Extensions",
+                "group": "Plugins",
                 "pages": [
                   "plugins/building-extensions",
+                  "plugins/sdk-migration",
                   "plugins/architecture",
                   "plugins/community",
                   "plugins/bundles",
-                  "plugins/voice-call",
-                  "plugins/zalouser",
                   "plugins/manifest",
                   "plugins/agent-tools",
                   "tools/capability-cookbook"
@@ -1090,6 +1090,7 @@
                 "group": "Automation",
                 "pages": [
                   "automation/hooks",
+                  "automation/standing-orders",
                   "automation/cron-jobs",
                   "automation/cron-vs-heartbeat",
                   "automation/troubleshooting",
