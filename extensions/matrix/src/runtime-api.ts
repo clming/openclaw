@@ -1,8 +1,8 @@
-// Re-export helper-api symbols from their local source to break the circular
-// re-export path: openclaw/plugin-sdk/matrix re-exports from
-// extensions/matrix/helper-api.js, so importing plugin-sdk/matrix here would
-// cause Jiti to define these properties twice (once via the local module graph
-// and once via the alias round-trip), triggering "Cannot redefine property".
+// Pre-export only the symbols that plugin-sdk/matrix re-exports from this
+// extension via helper-api.js and thread-bindings-runtime.js.  These must be
+// defined before the star re-export so Jiti's CJS interop guard
+// (hasOwnProperty check) skips the duplicate definition that would otherwise
+// come through the circular alias round-trip.
 export {
   requiresExplicitMatrixDefaultAccount,
   resolveMatrixDefaultOrOnlyAccountId,
@@ -14,7 +14,6 @@ export {
   resolveMatrixCredentialsPath,
   resolveMatrixLegacyFlatStoragePaths,
 } from "./storage-paths.js";
-// Thread-binding helpers that plugin-sdk/matrix re-exports from extensions/matrix.
 export {
   setMatrixThreadBindingIdleTimeoutBySessionKey,
   setMatrixThreadBindingMaxAgeBySessionKey,
