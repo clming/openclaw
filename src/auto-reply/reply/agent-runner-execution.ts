@@ -145,6 +145,7 @@ export async function runAgentTurnWithFallback(params: {
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
+  const wallClockStartedAt = Date.now();
   while (true) {
     try {
       const normalizeStreamingText = (payload: ReplyPayload): { text?: string; skip: boolean } => {
@@ -200,7 +201,6 @@ export async function runAgentTurnWithFallback(params: {
       };
       const blockReplyPipeline = params.blockReplyPipeline;
       const onToolResult = params.opts?.onToolResult;
-      const wallClockStartedAt = Date.now();
       const fallbackResult = await runWithModelFallback({
         ...resolveModelFallbackOptions(params.followupRun.run),
         runId,
