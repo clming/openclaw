@@ -157,6 +157,7 @@ export function createFollowupRunner(params: {
       let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
         activeSessionEntry?.systemPromptReport,
       );
+      const wallClockStartedAt = Date.now();
       try {
         const fallbackResult = await runWithModelFallback({
           cfg: queued.run.config,
@@ -252,7 +253,7 @@ export function createFollowupRunner(params: {
                       model: agentMeta.model,
                       usage: agentMeta.usage,
                       lastCallUsage: agentMeta.lastCallUsage,
-                      durationMs: result.meta?.durationMs,
+                      durationMs: Date.now() - wallClockStartedAt,
                     },
                   });
                 } catch {
