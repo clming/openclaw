@@ -199,6 +199,15 @@ export function extractAssistantText(message: unknown): string | undefined {
   return joined ? sanitizeUserFacingText(joined, { errorContext }) : undefined;
 }
 
+/**
+ * Check if a session key is valid agent session key format.
+ * Agent session keys match pattern: agent:agentid:label
+ * This is a quick format check, use validateAgentSessionKey for full validation.
+ */
+export function isAgentSessionKeyRef(ref: string): boolean {
+  return typeof ref === "string" && ref.startsWith("agent:") && ref.split(":").length === 3;
+}
+
 // ============================================================================
 // A2A Security Validation Functions
 // ============================================================================
