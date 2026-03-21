@@ -9,6 +9,7 @@ import {
   killProcessTree,
   resetSchtasksBaseMocks,
   schtasksCalls,
+  schtasksThrownErrors,
   schtasksResponses,
   withWindowsEnv,
   writeGatewayScript,
@@ -187,6 +188,25 @@ describe("Windows startup fallback", () => {
         status: "running",
         state: "Running",
         lastRunResult: "267009",
+      });
+      expect(schtasksCalls).toEqual([["/Query", "/TN", "OpenClaw Gateway", "/V", "/FO", "LIST"]]);
+    });
+  });
+
+  it("falls back to Startup runtime when the task-scoped schtasks query throws", async () => {
+    await withWindowsEnv("openclaw-win-startup-", async ({ env }) => {
+      schtasksThrownErrors.push(new Error("spawn ENOENT"));
+      await writeStartupFallbackEntry(env);
+      inspectPortUsage.mockResolvedValue({
+        port: 18789,
+        status: "busy",
+        listeners: [{ pid: 4242, command: "node.exe" }],
+        hints: [],
+      });
+
+      await expect(readScheduledTaskRuntime(env)).resolves.toMatchObject({
+        status: "running",
+        pid: 4242,
       });
       expect(schtasksCalls).toEqual([["/Query", "/TN", "OpenClaw Gateway", "/V", "/FO", "LIST"]]);
     });
