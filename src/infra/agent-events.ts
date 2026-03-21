@@ -74,9 +74,7 @@ export function resetAgentRunContextForTest() {
  * RFC-A2A-RESPONSE-ROUTING: Extract routing info from skill_invocation message.
  * Returns { correlationId, returnTo, timeout?, skill?, targetSessionKey? } if message is a valid skill_invocation.
  */
-export function extractSkillInvocationRouting(
-  message: string,
-): {
+export function extractSkillInvocationRouting(message: string): {
   correlationId: string;
   returnTo: string;
   timeout?: number;
