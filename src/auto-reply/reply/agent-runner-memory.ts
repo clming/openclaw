@@ -22,7 +22,7 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
-import { registerAgentRunContext } from "../../infra/agent-events.js";
+import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import type { TemplateContext } from "../templating.js";
 import type { VerboseLevel } from "../thinking.js";
 import type { GetReplyOptions } from "../types.js";
@@ -477,7 +477,7 @@ export async function runMemoryFlushIfNeeded(params: {
     .filter(Boolean)
     .join("\n\n");
   try {
-    await runWithModelFallback({
+    const flushFallbackResult = await runWithModelFallback({
       ...resolveModelFallbackOptions(params.followupRun.run),
       runId: flushRunId,
       run: async (provider, model, runOptions) => {
@@ -521,6 +521,26 @@ export async function runMemoryFlushIfNeeded(params: {
         return result;
       },
     });
+    // Emit supplementary usage event with accumulated token/cost data.
+    const flushAgentMeta = flushFallbackResult.result?.meta?.agentMeta;
+    if (flushAgentMeta?.usage) {
+      try {
+        emitAgentEvent({
+          runId: flushRunId,
+          stream: "lifecycle",
+          data: {
+            phase: "usage",
+            provider: flushAgentMeta.provider,
+            model: flushAgentMeta.model,
+            usage: flushAgentMeta.usage,
+            lastCallUsage: flushAgentMeta.lastCallUsage,
+            durationMs: Date.now() - memoryFlushNowMs,
+          },
+        });
+      } catch {
+        // Non-fatal: usage reporting should not surface as a run error.
+      }
+    }
     let memoryFlushCompactionCount =
       activeSessionEntry?.compactionCount ??
       (params.sessionKey ? activeSessionStore?.[params.sessionKey]?.compactionCount : 0) ??
