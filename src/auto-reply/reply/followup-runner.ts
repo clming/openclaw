@@ -246,6 +246,7 @@ export function createFollowupRunner(params: {
                 try {
                   emitAgentEvent({
                     runId,
+                    sessionKey: queued.run.sessionKey,
                     stream: "lifecycle",
                     data: {
                       phase: "usage",

@@ -286,6 +286,7 @@ export async function runAgentTurnWithFallback(params: {
                   try {
                     emitAgentEvent({
                       runId,
+                      sessionKey: params.sessionKey,
                       stream: "lifecycle",
                       data: {
                         phase: "usage",
@@ -507,6 +508,7 @@ export async function runAgentTurnWithFallback(params: {
                 try {
                   emitAgentEvent({
                     runId,
+                    sessionKey: params.sessionKey,
                     stream: "lifecycle",
                     data: {
                       phase: "usage",
