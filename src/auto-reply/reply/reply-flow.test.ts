@@ -646,6 +646,23 @@ describe("parseSlackDirectives", () => {
     ]);
   });
 
+  it("does not strip style-like suffixes from select option values", () => {
+    const result = parseSlackDirectives({
+      text: "[[slack_select: Pick | Danger path:workflow:danger, Safe:safe:primary]]",
+    });
+
+    expect(getSlackInteractive(result)).toEqual([
+      {
+        type: "select",
+        placeholder: "Pick",
+        options: [
+          { label: "Danger path", value: "workflow:danger" },
+          { label: "Safe", value: "safe:primary" },
+        ],
+      },
+    ]);
+  });
+
   it("leaves existing slack blocks in channelData and appends shared interactive blocks", () => {
     const result = parseSlackDirectives({
       text: "Act now [[slack_buttons: Retry:retry]]",
@@ -732,6 +749,35 @@ describe("parseSlackDirectives", () => {
       { type: "text", text: "Choose" },
       { type: "buttons", buttons: [{ label: "Retry", value: "retry" }] },
     ]);
+  });
+
+  it("parses button style suffix from slack_buttons directives", () => {
+    const result = parseSlackDirectives({
+      text: "Review [[slack_buttons: Approve:approve:primary, Reject:reject:danger, Skip:skip]]",
+    });
+
+    expect(result.text).toBe("Review");
+    expect(getSlackInteractive(result)).toEqual([
+      { type: "text", text: "Review" },
+      {
+        type: "buttons",
+        buttons: [
+          { label: "Approve", value: "approve", style: "primary" },
+          { label: "Reject", value: "reject", style: "danger" },
+          { label: "Skip", value: "skip" },
+        ],
+      },
+    ]);
+  });
+
+  it("ignores invalid button style suffixes", () => {
+    const result = parseSlackDirectives({
+      text: "[[slack_buttons: Go:go:blue]]",
+    });
+
+    const blocks = getSlackInteractive(result);
+    const buttons = blocks[0] as { buttons?: Array<{ style?: string }> };
+    expect(buttons.buttons?.[0]?.style).toBeUndefined();
   });
 
   it("ignores malformed directive choices when none remain", () => {
