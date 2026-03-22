@@ -400,7 +400,7 @@ export const agentHandlers: GatewayRequestHandlers = {
             );
           }
         } else if ("sessionKey" in route) {
-          if (classifySessionKeyShape(route.sessionKey) !== "malformed_agent") {
+          if (classifySessionKeyShape(route.sessionKey) === "agent") {
             const canonicalRouteSession = loadSessionEntry(route.sessionKey).canonicalKey;
             const routedAgentId = resolveAgentIdFromSessionKey(canonicalRouteSession);
             if (knownAgents.includes(routedAgentId)) {
@@ -413,7 +413,7 @@ export const agentHandlers: GatewayRequestHandlers = {
             }
           } else {
             context.logGateway.warn(
-              `voicewake routing ignored malformed sessionKey="${route.sessionKey}" trigger="${voiceWakeTrigger}"`,
+              `voicewake routing ignored non-canonical sessionKey="${route.sessionKey}" trigger="${voiceWakeTrigger}"`,
             );
           }
         }
