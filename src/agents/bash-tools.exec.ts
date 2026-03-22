@@ -511,6 +511,7 @@ export function createExecTool(
           maxOutput,
           pendingMaxOutput,
           trustedSafeBinDirs,
+          shellProfile: defaults?.shellProfile,
         });
         if (gatewayResult.pendingResult) {
           return gatewayResult.pendingResult;
@@ -547,6 +548,7 @@ export function createExecTool(
         scopeKey: defaults?.scopeKey,
         sessionKey: notifySessionKey,
         timeoutSec: effectiveTimeout,
+        shellProfile: defaults?.shellProfile,
         onUpdate,
       });
 

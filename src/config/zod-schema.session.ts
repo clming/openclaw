@@ -1,3 +1,4 @@
+import path from "node:path";
 import { z } from "zod";
 import { parseByteSize } from "../cli/parse-bytes.js";
 import { parseDurationMs } from "../cli/parse-duration.js";
@@ -12,6 +13,17 @@ import {
   TtsConfigSchema,
 } from "./zod-schema.core.js";
 import { sensitive } from "./zod-schema.sensitive.js";
+
+const WINDOWS_ABS_PATH_PATTERN = /^[A-Za-z]:[\\/]/;
+const WINDOWS_UNC_PATH_PATTERN = /^\\\\[^\\]+\\[^\\]+/;
+
+function isAbsolutePath(value: string): boolean {
+  return (
+    path.isAbsolute(value) ||
+    WINDOWS_ABS_PATH_PATTERN.test(value) ||
+    WINDOWS_UNC_PATH_PATTERN.test(value)
+  );
+}
 
 const SessionResetConfigSchema = z
   .object({
@@ -209,6 +221,13 @@ export const CommandsSchema = z
     ownerDisplay: z.enum(["raw", "hash"]).optional().default("raw"),
     ownerDisplaySecret: z.string().optional().register(sensitive),
     allowFrom: ElevatedAllowFromSchema.optional(),
+    shellProfile: z
+      .string()
+      .refine(
+        (val) => val.trim() === "" || isAbsolutePath(val.trim()),
+        "shellProfile must be an absolute file path.",
+      )
+      .optional(),
   })
   .strict()
   .optional()

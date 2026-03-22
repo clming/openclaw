@@ -67,6 +67,7 @@ export type ProcessGatewayAllowlistParams = {
   maxOutput: number;
   pendingMaxOutput: number;
   trustedSafeBinDirs?: ReadonlySet<string>;
+  shellProfile?: string;
 };
 
 export type ProcessGatewayAllowlistResult = {
@@ -302,6 +303,7 @@ export async function processGatewayAllowlist(
           scopeKey: params.scopeKey,
           sessionKey: params.notifySessionKey,
           timeoutSec: effectiveTimeout,
+          shellProfile: params.shellProfile,
         });
       } catch {
         await sendExecApprovalFollowupResult(
