@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type {
   BaseProbeResult as ContractBaseProbeResult,
   BaseTokenResolution as ContractBaseTokenResolution,
@@ -45,6 +45,7 @@ import type {
 import { pluginSdkSubpaths } from "./entrypoints.js";
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = resolve(ROOT_DIR, "..");
 const PLUGIN_SDK_DIR = resolve(ROOT_DIR, "plugin-sdk");
 const sourceCache = new Map<string, string>();
 const representativeRuntimeSmokeSubpaths = [
@@ -58,7 +59,21 @@ const representativeRuntimeSmokeSubpaths = [
   "webhook-ingress",
 ] as const;
 
-const importPluginSdkSubpath = (specifier: string) => import(/* @vite-ignore */ specifier);
+function resolvePluginSdkImportTarget(specifier: string): string {
+  const subpath = specifier.replace(/^openclaw\/plugin-sdk\/?/, "") || "index";
+  const builtEntryPath = resolve(REPO_ROOT, "dist", "plugin-sdk", `${subpath}.js`);
+  if (existsSync(builtEntryPath)) {
+    return specifier;
+  }
+
+  // Unit-test shards do not always run `pnpm build` first. Fall back to the
+  // source entry file so we still verify the curated runtime surface without
+  // depending on prebuilt dist artifacts.
+  return pathToFileURL(resolve(PLUGIN_SDK_DIR, `${subpath}.ts`)).href;
+}
+
+const importPluginSdkSubpath = (specifier: string) =>
+  import(/* @vite-ignore */ resolvePluginSdkImportTarget(specifier));
 
 function readPluginSdkSource(subpath: string): string {
   const file = resolve(PLUGIN_SDK_DIR, `${subpath}.ts`);
