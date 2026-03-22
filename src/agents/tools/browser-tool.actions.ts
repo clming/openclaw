@@ -56,25 +56,6 @@ function formatTabsToolResult(tabs: unknown[]): AgentToolResult<unknown> {
   };
 }
 
-function formatConsoleToolResult(result: {
-  targetId?: string;
-  messages?: unknown[];
-}): AgentToolResult<unknown> {
-  const wrapped = wrapBrowserExternalJson({
-    kind: "console",
-    payload: result,
-    includeWarning: false,
-  });
-  return {
-    content: [{ type: "text" as const, text: wrapped.wrappedText }],
-    details: {
-      ...wrapped.safeDetails,
-      targetId: typeof result.targetId === "string" ? result.targetId : undefined,
-      messageCount: Array.isArray(result.messages) ? result.messages.length : undefined,
-    },
-  };
-}
-
 function isChromeStaleTargetError(profile: string | undefined, err: unknown): boolean {
   if (!profile) {
     return false;
@@ -288,11 +269,37 @@ export async function executeConsoleAction(params: {
         level,
         targetId,
       },
-    })) as { ok?: boolean; targetId?: string; messages?: unknown[] };
-    return formatConsoleToolResult(result);
+    })) as { ok?: boolean; targetId?: string; url?: string; messages?: unknown[] };
+    const wrapped = wrapBrowserExternalJson({
+      kind: "console",
+      payload: result,
+      includeWarning: false,
+    });
+    return {
+      content: [{ type: "text" as const, text: wrapped.wrappedText }],
+      details: {
+        ...wrapped.safeDetails,
+        targetId: typeof result.targetId === "string" ? result.targetId : undefined,
+        url: typeof result.url === "string" ? result.url : undefined,
+        messageCount: Array.isArray(result.messages) ? result.messages.length : undefined,
+      },
+    };
   }
   const result = await browserConsoleMessages(baseUrl, { level, targetId, profile });
-  return formatConsoleToolResult(result);
+  const wrapped = wrapBrowserExternalJson({
+    kind: "console",
+    payload: result,
+    includeWarning: false,
+  });
+  return {
+    content: [{ type: "text" as const, text: wrapped.wrappedText }],
+    details: {
+      ...wrapped.safeDetails,
+      targetId: result.targetId,
+      url: result.url,
+      messageCount: result.messages.length,
+    },
+  };
 }
 
 export async function executeActAction(params: {
