@@ -70,6 +70,11 @@ export {
   SYNTHETIC_MODEL_CATALOG,
 } from "../agents/synthetic-models.js";
 export {
+  buildFeatherlessModelDefinition,
+  FEATHERLESS_BASE_URL,
+  FEATHERLESS_MODEL_CATALOG,
+} from "../agents/featherless-models.js";
+export {
   buildTogetherModelDefinition,
   TOGETHER_BASE_URL,
   TOGETHER_MODEL_CATALOG,

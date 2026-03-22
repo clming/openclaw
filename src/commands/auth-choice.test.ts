@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import anthropicPlugin from "../../extensions/anthropic/index.js";
 import chutesPlugin from "../../extensions/chutes/index.js";
 import cloudflareAiGatewayPlugin from "../../extensions/cloudflare-ai-gateway/index.js";
+import featherlessPlugin from "../../extensions/featherless/index.js";
 import googlePlugin from "../../extensions/google/index.js";
 import huggingfacePlugin from "../../extensions/huggingface/index.js";
 import kimiCodingPlugin from "../../extensions/kimi-coding/index.js";
@@ -100,6 +101,7 @@ function createDefaultProviderPlugins() {
     openrouterPlugin,
     qianfanPlugin,
     qwenPortalAuthPlugin,
+    featherlessPlugin,
     syntheticPlugin,
     togetherPlugin,
     venicePlugin,

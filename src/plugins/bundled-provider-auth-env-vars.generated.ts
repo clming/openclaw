@@ -7,6 +7,7 @@ export const BUNDLED_PROVIDER_AUTH_ENV_VAR_CANDIDATES = {
   chutes: ["CHUTES_API_KEY", "CHUTES_OAUTH_TOKEN"],
   "cloudflare-ai-gateway": ["CLOUDFLARE_AI_GATEWAY_API_KEY"],
   fal: ["FAL_KEY"],
+  featherless: ["FEATHERLESS_API_KEY"],
   firecrawl: ["FIRECRAWL_API_KEY"],
   "github-copilot": ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"],
   google: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
