@@ -2,7 +2,7 @@ import { normalizeToolName } from "../agents/tool-policy.js";
 import type { AnyAgentTool } from "../agents/tools/common.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { applyTestPluginDefaults, normalizePluginsConfig } from "./config-state.js";
-import { loadOpenClawPlugins } from "./loader.js";
+import { resolveEffectivePluginRegistry } from "./effective-registry.js";
 import { createPluginLoaderLogger } from "./logger.js";
 import type { OpenClawPluginToolContext } from "./types.js";
 
@@ -59,7 +59,7 @@ export function resolvePluginTools(params: {
     return [];
   }
 
-  const registry = loadOpenClawPlugins({
+  const registry = resolveEffectivePluginRegistry({
     config: effectiveConfig,
     workspaceDir: params.context.workspaceDir,
     runtimeOptions: params.allowGatewaySubagentBinding

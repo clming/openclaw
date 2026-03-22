@@ -14,6 +14,8 @@ vi.mock("./loader.js", () => ({
 }));
 
 let resolvePluginTools: typeof import("./tools.js").resolvePluginTools;
+let setActivePluginRegistry: typeof import("./runtime.js").setActivePluginRegistry;
+let resetPluginRuntimeStateForTest: typeof import("./runtime.js").resetPluginRuntimeStateForTest;
 
 function makeTool(name: string) {
   return {
@@ -95,6 +97,8 @@ describe("resolvePluginTools optional tools", () => {
     vi.resetModules();
     loadOpenClawPluginsMock.mockClear();
     ({ resolvePluginTools } = await import("./tools.js"));
+    ({ setActivePluginRegistry, resetPluginRuntimeStateForTest } = await import("./runtime.js"));
+    resetPluginRuntimeStateForTest();
   });
 
   it("skips optional tools without explicit allowlist", () => {
@@ -190,5 +194,33 @@ describe("resolvePluginTools optional tools", () => {
         },
       }),
     );
+  });
+
+  it("reuses the active plugin registry when one is already loaded", () => {
+    const activeRegistry = {
+      tools: [
+        {
+          pluginId: "optional-demo",
+          optional: true,
+          source: "/tmp/optional-demo.js",
+          factory: () => makeTool("optional_tool"),
+        },
+      ],
+      diagnostics: [] as Array<{
+        level: string;
+        pluginId: string;
+        source: string;
+        message: string;
+      }>,
+    };
+    setActivePluginRegistry(activeRegistry as never, "active-registry");
+
+    const tools = resolvePluginTools({
+      context: createContext() as never,
+      toolAllowlist: ["optional_tool"],
+    });
+
+    expect(tools.map((tool) => tool.name)).toEqual(["optional_tool"]);
+    expect(loadOpenClawPluginsMock).not.toHaveBeenCalled();
   });
 });

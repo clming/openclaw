@@ -1,6 +1,6 @@
 import { normalizeProviderId } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import { loadOpenClawPlugins } from "../../plugins/loader.js";
+import { resolveEffectivePluginRegistry } from "../../plugins/effective-registry.js";
 import { getActivePluginRegistry } from "../../plugins/runtime.js";
 import type { MediaUnderstandingProvider } from "../types.js";
 import { deepgramProvider } from "./deepgram/index.js";
@@ -40,11 +40,9 @@ export function buildMediaUnderstandingRegistry(
   for (const provider of PROVIDERS) {
     mergeProviderIntoRegistry(registry, provider);
   }
-  const active = getActivePluginRegistry();
-  const pluginRegistry =
-    (active?.mediaUnderstandingProviders?.length ?? 0) > 0
-      ? active
-      : loadOpenClawPlugins({ config: cfg });
+  const pluginRegistry = cfg
+    ? resolveEffectivePluginRegistry({ config: cfg })
+    : getActivePluginRegistry();
   for (const entry of pluginRegistry?.mediaUnderstandingProviders ?? []) {
     mergeProviderIntoRegistry(registry, entry.provider);
   }

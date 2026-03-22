@@ -7,6 +7,7 @@ type RegistryState = {
   registry: PluginRegistry | null;
   httpRouteRegistry: PluginRegistry | null;
   httpRouteRegistryPinned: boolean;
+  loaded: boolean;
   key: string | null;
   version: number;
 };
@@ -20,6 +21,7 @@ const state: RegistryState = (() => {
       registry: createEmptyPluginRegistry(),
       httpRouteRegistry: null,
       httpRouteRegistryPinned: false,
+      loaded: false,
       key: null,
       version: 0,
     };
@@ -32,8 +34,13 @@ export function setActivePluginRegistry(registry: PluginRegistry, cacheKey?: str
   if (!state.httpRouteRegistryPinned) {
     state.httpRouteRegistry = registry;
   }
+  state.loaded = true;
   state.key = cacheKey ?? null;
   state.version += 1;
+}
+
+export function hasLoadedPluginRegistry(): boolean {
+  return state.loaded;
 }
 
 export function getActivePluginRegistry(): PluginRegistry | null {
@@ -104,6 +111,7 @@ export function resetPluginRuntimeStateForTest(): void {
   state.registry = emptyRegistry;
   state.httpRouteRegistry = emptyRegistry;
   state.httpRouteRegistryPinned = false;
+  state.loaded = false;
   state.key = null;
   state.version += 1;
 }

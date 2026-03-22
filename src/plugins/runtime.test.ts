@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createEmptyPluginRegistry } from "./registry.js";
 import {
+  hasLoadedPluginRegistry,
   pinActivePluginHttpRouteRegistry,
   releasePinnedPluginHttpRouteRegistry,
   resetPluginRuntimeStateForTest,
@@ -67,5 +68,13 @@ describe("plugin runtime route registry", () => {
     pinActivePluginHttpRouteRegistry(startupRegistry);
 
     expect(resolveActivePluginHttpRouteRegistry(explicitRegistry)).toBe(startupRegistry);
+  });
+
+  it("tracks whether an active registry was explicitly loaded", () => {
+    expect(hasLoadedPluginRegistry()).toBe(false);
+
+    setActivePluginRegistry(createEmptyPluginRegistry(), "active-registry");
+
+    expect(hasLoadedPluginRegistry()).toBe(true);
   });
 });
