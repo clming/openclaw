@@ -53,6 +53,7 @@ async function applySlackMessageSendingHooks(params: {
   threadTs?: string;
   accountId?: string;
   mediaUrl?: string;
+  sessionKey?: string;
 }): Promise<{ cancelled: boolean; text: string }> {
   const hookRunner = getGlobalHookRunner();
   if (!hookRunner?.hasHooks("message_sending")) {
@@ -68,7 +69,7 @@ async function applySlackMessageSendingHooks(params: {
         ...(params.mediaUrl ? { mediaUrl: params.mediaUrl } : {}),
       },
     },
-    { channelId: "slack", accountId: params.accountId ?? undefined },
+    { channelId: "slack", accountId: params.accountId ?? undefined, sessionKey: params.sessionKey },
   );
   if (hookResult?.cancel) {
     return { cancelled: true, text: params.text };
@@ -88,6 +89,7 @@ async function sendSlackOutboundMessage(params: {
   replyToId?: string | null;
   threadId?: string | number | null;
   identity?: OutboundIdentity;
+  sessionKey?: string;
 }) {
   const send =
     resolveOutboundSendDep<typeof sendMessageSlack>(params.deps, "slack") ?? sendMessageSlack;
@@ -99,6 +101,7 @@ async function sendSlackOutboundMessage(params: {
     threadTs,
     mediaUrl: params.mediaUrl,
     accountId: params.accountId ?? undefined,
+    sessionKey: params.sessionKey,
   });
   if (hookResult.cancelled) {
     return {
@@ -188,6 +191,7 @@ export const slackOutbound: ChannelOutboundAdapter = {
             replyToId: ctx.replyToId,
             threadId: ctx.threadId,
             identity: ctx.identity,
+            sessionKey: ctx.sessionKey,
           }),
         finalize: async () =>
           await sendSlackOutboundMessage({
@@ -201,13 +205,24 @@ export const slackOutbound: ChannelOutboundAdapter = {
             replyToId: ctx.replyToId,
             threadId: ctx.threadId,
             identity: ctx.identity,
+            sessionKey: ctx.sessionKey,
           }),
       }),
     );
   },
   ...createAttachedChannelResultAdapter({
     channel: "slack",
-    sendText: async ({ cfg, to, text, accountId, deps, replyToId, threadId, identity }) =>
+    sendText: async ({
+      cfg,
+      to,
+      text,
+      accountId,
+      deps,
+      replyToId,
+      threadId,
+      identity,
+      sessionKey,
+    }) =>
       await sendSlackOutboundMessage({
         cfg,
         to,
@@ -217,6 +232,7 @@ export const slackOutbound: ChannelOutboundAdapter = {
         replyToId,
         threadId,
         identity,
+        sessionKey,
       }),
     sendMedia: async ({
       cfg,
@@ -229,6 +245,7 @@ export const slackOutbound: ChannelOutboundAdapter = {
       replyToId,
       threadId,
       identity,
+      sessionKey,
     }) =>
       await sendSlackOutboundMessage({
         cfg,
@@ -241,6 +258,7 @@ export const slackOutbound: ChannelOutboundAdapter = {
         replyToId,
         threadId,
         identity,
+        sessionKey,
       }),
   }),
 };
