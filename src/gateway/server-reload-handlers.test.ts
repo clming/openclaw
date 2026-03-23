@@ -47,10 +47,7 @@ vi.mock("./restart-deferral.js", () => ({
 
 const { createGatewayReloadHandlers } = await import("./server-reload-handlers.js");
 
-function createHandlers(logReload: {
-  info: ReturnType<typeof vi.fn>;
-  warn: ReturnType<typeof vi.fn>;
-}) {
+function createHandlers(logReload: Parameters<typeof createGatewayReloadHandlers>[0]["logReload"]) {
   return createGatewayReloadHandlers({
     deps: {} as never,
     broadcast: () => {},
@@ -123,6 +120,7 @@ describe("gateway reload restart deferral", () => {
         restartBrowserControl: false,
         restartCron: false,
         restartHeartbeat: false,
+        restartHealthMonitor: false,
         restartChannels: new Set(),
         noopPaths: [],
       },
