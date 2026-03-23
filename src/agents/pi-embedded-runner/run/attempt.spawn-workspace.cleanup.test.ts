@@ -75,13 +75,15 @@ describe("runEmbeddedAttempt cleanup", () => {
       expect.any(Object),
       "agent:main:test-cleanup",
     );
-    expect(hoisted.clearActiveEmbeddedRunMock.mock.invocationCallOrder[0]).toBeLessThan(
-      hoisted.flushPendingToolResultsAfterIdleMock.mock.invocationCallOrder[0] ??
-        Number.POSITIVE_INFINITY,
+    expect(hoisted.flushPendingToolResultsAfterIdleMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.clearActiveEmbeddedRunMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
     expect(disposeMock).toHaveBeenCalledTimes(1);
     expect(hoisted.releaseWsSessionMock).toHaveBeenCalledWith("embedded-session");
     expect(hoisted.sessionLockReleaseMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.sessionLockReleaseMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.clearActiveEmbeddedRunMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   it("skips active-run clear without masking the original error when subscribe fails before registration", async () => {
@@ -131,7 +133,7 @@ describe("runEmbeddedAttempt cleanup", () => {
     expect(hoisted.flushPendingToolResultsAfterIdleMock).toHaveBeenCalledTimes(1);
   });
 
-  it("clears the active run before waiting for the idle flush", async () => {
+  it("clears the active run only after idle flush and session lock release finish", async () => {
     const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cleanup-workspace-"));
     const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cleanup-agent-"));
     const sessionFile = path.join(workspaceDir, "session.jsonl");
@@ -166,9 +168,57 @@ describe("runEmbeddedAttempt cleanup", () => {
     expect(result.promptError).toBeNull();
     expect(hoisted.clearActiveEmbeddedRunMock).toHaveBeenCalledTimes(1);
     expect(hoisted.flushPendingToolResultsAfterIdleMock).toHaveBeenCalledTimes(1);
-    expect(hoisted.clearActiveEmbeddedRunMock.mock.invocationCallOrder[0]).toBeLessThan(
-      hoisted.flushPendingToolResultsAfterIdleMock.mock.invocationCallOrder[0] ??
-        Number.POSITIVE_INFINITY,
+    expect(hoisted.sessionLockReleaseMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.flushPendingToolResultsAfterIdleMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.sessionLockReleaseMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(hoisted.sessionLockReleaseMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.clearActiveEmbeddedRunMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+
+  it("keeps the active run registered when session lock release fails", async () => {
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cleanup-workspace-"));
+    const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cleanup-agent-"));
+    const sessionFile = path.join(workspaceDir, "session.jsonl");
+    tempPaths.push(workspaceDir, agentDir);
+    await fs.writeFile(sessionFile, "", "utf8");
+
+    const lockReleaseError = new Error("lock release failed");
+    hoisted.sessionLockReleaseMock.mockRejectedValueOnce(lockReleaseError);
+    hoisted.createAgentSessionMock.mockImplementation(async () => ({
+      session: createDefaultEmbeddedSession(),
+    }));
+
+    const runEmbeddedAttempt = await loadRunEmbeddedAttempt();
+    await expect(
+      runEmbeddedAttempt({
+        sessionId: "embedded-session",
+        sessionKey: "agent:main:test-cleanup-lock-release",
+        sessionFile,
+        workspaceDir,
+        agentDir,
+        config: {},
+        prompt: "hello",
+        timeoutMs: 10_000,
+        runId: "run-cleanup-lock-release",
+        provider: "openai",
+        modelId: "gpt-test",
+        model: testModel,
+        authStorage: {} as AuthStorage,
+        modelRegistry: {} as ModelRegistry,
+        thinkLevel: "off",
+        senderIsOwner: true,
+        disableMessageTool: true,
+      }),
+    ).rejects.toThrow(lockReleaseError);
+
+    expect(hoisted.flushPendingToolResultsAfterIdleMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.sessionLockReleaseMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.clearActiveEmbeddedRunMock).not.toHaveBeenCalled();
+    expect(hoisted.releaseWsSessionMock).toHaveBeenCalledWith("embedded-session");
+    expect(hoisted.flushPendingToolResultsAfterIdleMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.sessionLockReleaseMock.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
 });

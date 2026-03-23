@@ -181,28 +181,21 @@ async function runCleanupSteps(
   steps: ReadonlyArray<{ label: string; run: () => void | Promise<void> }>,
 ): Promise<void> {
   let firstError: unknown;
-  let hasError = false;
 
   for (const step of steps) {
     try {
       await step.run();
     } catch (err) {
-      if (!hasError) {
+      if (firstError === undefined) {
         firstError = err;
-        hasError = true;
-        log.warn(
-          `embedded attempt cleanup failed during ${step.label}: ${describeUnknownError(err)}`,
-        );
-        continue;
       }
-
       log.warn(
         `embedded attempt cleanup failed during ${step.label}: ${describeUnknownError(err)}`,
       );
     }
   }
 
-  if (hasError) {
+  if (firstError !== undefined) {
     throw firstError;
   }
 }
@@ -3246,28 +3239,12 @@ export async function runEmbeddedAttempt(
       // flushPendingToolResults() fires while tools are still executing, inserting
       // synthetic "missing tool result" errors and causing silent agent failures.
       // See: https://github.com/openclaw/openclaw/issues/8643
+      let sessionLockReleased = false;
       await runCleanupSteps([
         {
           label: "tool result context guard removal",
           run: () => {
             removeToolResultContextGuard?.();
-          },
-        },
-        {
-          // Clear embedded run BEFORE flushing pending tool results so that
-          // waitForEmbeddedPiRunEnd resolves promptly. The flush can take up to 30s
-          // (idle-wait timeout in wait-for-idle-before-flush.ts), but several callers
-          // only wait 15s (session-reset-service.ts, commands-compact.ts). Clearing
-          // first ensures the run is marked ended within the waiter timeout budget.
-          //
-          // This is safe because runCleanupSteps executes each step in an isolated
-          // try/catch — if this step throws (e.g. queueHandle is somehow invalid),
-          // the flush and remaining teardown still proceed.
-          label: "active embedded run clear",
-          run: () => {
-            if (queueHandle) {
-              clearActiveEmbeddedRun(params.sessionId, queueHandle, params.sessionKey);
-            }
           },
         },
         {
@@ -3301,7 +3278,22 @@ export async function runEmbeddedAttempt(
         },
         {
           label: "session lock release",
-          run: () => sessionLock.release(),
+          run: async () => {
+            await sessionLock.release();
+            sessionLockReleased = true;
+          },
+        },
+        {
+          // Keep the embedded run registered until idle flush and lock release finish.
+          // waitForEmbeddedPiRunEnd() and restart drains rely on this barrier so yielded
+          // or aborted runs do not look fully idle while descendant spawns/tool cleanup
+          // may still be settling.
+          label: "active embedded run clear",
+          run: () => {
+            if (queueHandle && sessionLockReleased) {
+              clearActiveEmbeddedRun(params.sessionId, queueHandle, params.sessionKey);
+            }
+          },
         },
       ]);
     }
