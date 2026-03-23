@@ -3,7 +3,12 @@ import { definePluginEntry, type ProviderAuthContext } from "openclaw/plugin-sdk
 import { coerceSecretRef } from "openclaw/plugin-sdk/provider-auth";
 import { githubCopilotLoginCommand } from "openclaw/plugin-sdk/provider-auth-login";
 import { PROVIDER_ID, resolveCopilotForwardCompatModel } from "./models.js";
-import { DEFAULT_COPILOT_API_BASE_URL, resolveCopilotApiToken } from "./token.js";
+import {
+  COPILOT_EDITOR_HEADERS,
+  DEFAULT_COPILOT_API_BASE_URL,
+  isGitHubPAT,
+  resolveCopilotApiToken,
+} from "./token.js";
 import { fetchCopilotUsage } from "./usage.js";
 
 const COPILOT_ENV_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
@@ -121,6 +126,8 @@ export default definePluginEntry({
             return null;
           }
           let baseUrl = DEFAULT_COPILOT_API_BASE_URL;
+          // PATs are sent directly to the enterprise endpoint with editor headers.
+          const needsEditorHeaders = githubToken ? isGitHubPAT(githubToken) : false;
           if (githubToken) {
             try {
               const token = await resolveCopilotApiToken({
@@ -136,6 +143,7 @@ export default definePluginEntry({
             provider: {
               baseUrl,
               models: [],
+              ...(needsEditorHeaders ? { headers: { ...COPILOT_EDITOR_HEADERS } } : {}),
             },
           };
         },
