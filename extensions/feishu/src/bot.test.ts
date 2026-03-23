@@ -158,7 +158,7 @@ describe("handleFeishuMessage ACP routing", () => {
     });
     mockSendMessageFeishu
       .mockReset()
-      .mockResolvedValue({ messageId: "reply-msg", chatId: "oc_dm" });
+      .mockResolvedValue({ messageId: "reply-msg", chatId: "p2p_user_abc" });
     mockCreateFeishuReplyDispatcher.mockReset().mockReturnValue({
       dispatcher: {
         sendToolResult: vi.fn(),
@@ -290,7 +290,7 @@ describe("handleFeishuMessage ACP routing", () => {
         sender: { sender_id: { open_id: "ou_sender_1" } },
         message: {
           message_id: "msg-1",
-          chat_id: "oc_dm",
+          chat_id: "p2p_user_abc",
           chat_type: "p2p",
           message_type: "text",
           content: JSON.stringify({ text: "hello" }),
@@ -379,7 +379,7 @@ describe("handleFeishuMessage ACP routing", () => {
         sender: { sender_id: { open_id: "ou_sender_1" } },
         message: {
           message_id: "msg-2",
-          chat_id: "oc_dm",
+          chat_id: "p2p_user_abc",
           chat_type: "p2p",
           message_type: "text",
           content: JSON.stringify({ text: "hello" }),
@@ -389,7 +389,7 @@ describe("handleFeishuMessage ACP routing", () => {
 
     expect(mockSendMessageFeishu).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "chat:oc_dm",
+        to: "chat:p2p_user_abc",
         text: expect.stringContaining("runtime unavailable"),
       }),
     );
@@ -774,7 +774,7 @@ describe("handleFeishuMessage command authorization", () => {
       },
       message: {
         message_id: "msg-pairing-chat-reply",
-        chat_id: "oc_dm_chat_1",
+        chat_id: "p2p_dm_chat_1",
         chat_type: "p2p",
         message_type: "text",
         content: JSON.stringify({ text: "hello" }),
@@ -788,7 +788,7 @@ describe("handleFeishuMessage command authorization", () => {
 
     expect(mockSendMessageFeishu).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "chat:oc_dm_chat_1",
+        to: "chat:p2p_dm_chat_1",
       }),
     );
   });
