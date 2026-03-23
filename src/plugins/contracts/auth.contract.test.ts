@@ -13,8 +13,6 @@ import type { OpenClawPluginApi, ProviderPlugin } from "../types.js";
 
 type LoginOpenAICodexOAuth =
   (typeof import("openclaw/plugin-sdk/provider-auth-login"))["loginOpenAICodexOAuth"];
-type LoginQwenPortalOAuth =
-  (typeof import("../../../extensions/qwen-portal-auth/oauth.js"))["loginQwenPortalOAuth"];
 type GithubCopilotLoginCommand =
   (typeof import("openclaw/plugin-sdk/provider-auth-login"))["githubCopilotLoginCommand"];
 type CreateVpsAwareHandlers =
@@ -25,7 +23,6 @@ type ListProfilesForProvider =
   typeof import("openclaw/plugin-sdk/agent-runtime").listProfilesForProvider;
 
 const loginOpenAICodexOAuthMock = vi.hoisted(() => vi.fn<LoginOpenAICodexOAuth>());
-const loginQwenPortalOAuthMock = vi.hoisted(() => vi.fn<LoginQwenPortalOAuth>());
 const githubCopilotLoginCommandMock = vi.hoisted(() => vi.fn<GithubCopilotLoginCommand>());
 const ensureAuthProfileStoreMock = vi.hoisted(() => vi.fn<EnsureAuthProfileStore>());
 const listProfilesForProviderMock = vi.hoisted(() => vi.fn<ListProfilesForProvider>());
@@ -48,13 +45,8 @@ vi.mock("openclaw/plugin-sdk/agent-runtime", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../extensions/qwen-portal-auth/oauth.js", () => ({
-  loginQwenPortalOAuth: loginQwenPortalOAuthMock,
-}));
-
 import githubCopilotPlugin from "../../../extensions/github-copilot/index.js";
 import openAIPlugin from "../../../extensions/openai/index.js";
-import qwenPortalPlugin from "../../../extensions/qwen-portal-auth/index.js";
 
 function registerProviders(...plugins: Array<{ register(api: OpenClawPluginApi): void }>) {
   const captured = createCapturedPluginRegistration();
@@ -125,7 +117,6 @@ describe("provider auth contract", () => {
 
   afterEach(() => {
     loginOpenAICodexOAuthMock.mockReset();
-    loginQwenPortalOAuthMock.mockReset();
     githubCopilotLoginCommandMock.mockReset();
     ensureAuthProfileStoreMock.mockReset();
     listProfilesForProviderMock.mockReset();
@@ -178,50 +169,6 @@ describe("provider auth contract", () => {
     await expect(provider.auth[0]?.run(buildAuthContext() as never)).resolves.toEqual({
       profiles: [],
     });
-  });
-
-  it("keeps Qwen portal OAuth auth results provider-owned", async () => {
-    const provider = requireProvider(registerProviders(qwenPortalPlugin), "qwen-portal");
-    loginQwenPortalOAuthMock.mockResolvedValueOnce({
-      access: "access-token",
-      refresh: "refresh-token",
-      expires: 1_700_000_000_000,
-      resourceUrl: "portal.qwen.ai",
-    });
-
-    const result = await provider.auth[0]?.run(buildAuthContext() as never);
-
-    expect(result).toMatchObject({
-      profiles: [
-        {
-          profileId: "qwen-portal:default",
-          credential: {
-            type: "oauth",
-            provider: "qwen-portal",
-            access: "access-token",
-            refresh: "refresh-token",
-            expires: 1_700_000_000_000,
-          },
-        },
-      ],
-      defaultModel: "qwen-portal/coder-model",
-      configPatch: {
-        models: {
-          providers: {
-            "qwen-portal": {
-              baseUrl: "https://portal.qwen.ai/v1",
-              models: [],
-            },
-          },
-        },
-      },
-    });
-    expect(result?.notes).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("auto-refresh"),
-        expect.stringContaining("Base URL defaults"),
-      ]),
-    );
   });
 
   it("keeps GitHub Copilot device auth results provider-owned", async () => {

@@ -150,7 +150,6 @@ const LOCAL_EXTENSION_API_BARREL_GUARDS = [
   "phone-control",
   "copilot-proxy",
   "zai",
-  "qwen-portal-auth",
   "signal",
   "synology-chat",
   "talk-voice",
