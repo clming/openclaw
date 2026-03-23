@@ -845,15 +845,18 @@ extension MacNodeRuntime {
         displayCommand: String)
     {
         guard security == .allowlist, allowlistSatisfied else { return }
-        var seenPatterns = Set<String>()
+        // Dedup by pattern+args so distinct exact-match entries update independently.
+        var seenKeys = Set<String>()
         for (idx, match) in allowlistMatches.enumerated() {
-            if !seenPatterns.insert(match.pattern).inserted {
+            let key = match.pattern + "\0" + (match.args.map { $0.joined(separator: "\0") } ?? "")
+            if !seenKeys.insert(key).inserted {
                 continue
             }
             let resolvedPath = idx < allowlistResolutions.count ? allowlistResolutions[idx].resolvedPath : nil
             ExecApprovalsStore.recordAllowlistUse(
                 agentId: agentId,
                 pattern: match.pattern,
+                args: match.args,
                 command: displayCommand,
                 resolvedPath: resolvedPath)
         }

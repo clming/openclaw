@@ -516,6 +516,7 @@ enum ExecApprovalsStore {
     static func recordAllowlistUse(
         agentId: String?,
         pattern: String,
+        args: [String]? = nil,
         command: String,
         resolvedPath: String?)
     {
@@ -524,7 +525,9 @@ enum ExecApprovalsStore {
             var agents = file.agents ?? [:]
             var entry = agents[key] ?? ExecApprovalsAgent()
             let allowlist = (entry.allowlist ?? []).map { item -> ExecAllowlistEntry in
-                guard item.pattern == pattern else { return item }
+                // Match on pattern+args identity so distinct exact-match entries
+                // (e.g. `python3 safe.py` vs `python3 other.py`) update independently.
+                guard item.pattern == pattern, item.args == args else { return item }
                 return ExecAllowlistEntry(
                     id: item.id,
                     pattern: item.pattern,

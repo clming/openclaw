@@ -7,7 +7,6 @@ import {
   requiresExecApproval,
   resolveAllowAlwaysPatterns,
   resolveSafeBins,
-  type AllowAlwaysResolvedEntry,
 } from "./exec-approvals.js";
 
 describe("resolveAllowAlwaysPatterns", () => {
@@ -247,7 +246,7 @@ describe("resolveAllowAlwaysPatterns", () => {
       env,
       safeBins,
     });
-    expect(persisted).toEqual([touch]);
+    expect(persisted).toEqual([{ pattern: touch, args: null }]);
 
     const second = evaluateShellAllowlist({
       command: `sh -lc '$0 "$1"' touch ${path.join(dir, "second-marker")}`,
@@ -275,7 +274,7 @@ describe("resolveAllowAlwaysPatterns", () => {
       env,
       safeBins,
     });
-    expect(persisted).toEqual([touch]);
+    expect(persisted).toEqual([{ pattern: touch, args: null }]);
 
     const second = evaluateShellAllowlist({
       command: `sh -lc 'exec -- "$0" "$1"' touch ${path.join(dir, "second-marker")}`,
@@ -496,8 +495,8 @@ $0 \\"$1\\"" touch ${marker}`,
       env: makePathEnv(dir),
       platform: process.platform,
     });
-    expect(patterns).toEqual([whoami]);
-    expect(patterns).not.toContain("/usr/bin/time");
+    expect(patterns).toEqual([{ pattern: whoami, args: null }]);
+    expect(patterns.map((e) => e.pattern)).not.toContain("/usr/bin/time");
   });
 
   it("unwraps busybox/toybox shell applets and persists inner executables", () => {

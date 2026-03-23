@@ -7,6 +7,7 @@ import OSLog
 
 struct ExecApprovalPromptRequest: Codable {
     var command: String
+    var commandArgv: [String]?
     var cwd: String?
     var host: String?
     var security: String?
@@ -430,9 +431,11 @@ private enum ExecHostExecutor {
         self.persistAllowlistEntry(decision: request.approvalDecision, context: context)
 
         if context.allowlistSatisfied {
-            var seenPatterns = Set<String>()
+            // Dedup by pattern+args so distinct exact-match entries update independently.
+            var seenKeys = Set<String>()
             for (idx, match) in context.allowlistMatches.enumerated() {
-                if !seenPatterns.insert(match.pattern).inserted {
+                let key = match.pattern + "\0" + (match.args.map { $0.joined(separator: "\0") } ?? "")
+                if !seenKeys.insert(key).inserted {
                     continue
                 }
                 let resolvedPath = idx < context.allowlistResolutions.count
@@ -441,6 +444,7 @@ private enum ExecHostExecutor {
                 ExecApprovalsStore.recordAllowlistUse(
                     agentId: context.agentId,
                     pattern: match.pattern,
+                    args: match.args,
                     command: context.displayCommand,
                     resolvedPath: resolvedPath)
             }

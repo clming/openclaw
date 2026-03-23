@@ -140,7 +140,9 @@ describe("exact-match with shell wrapper unwrapping", () => {
   }
 
   it("shell wrapper unwrapping preserves inner args", () => {
-    if (process.platform === "win32") return;
+    if (process.platform === "win32") {
+      return;
+    }
     const dir = makeTempDir();
     const python3 = makeExecutable(dir, "python3");
     const entries = resolveAllowAlwaysPatterns({
@@ -163,7 +165,9 @@ describe("exact-match with shell wrapper unwrapping", () => {
   });
 
   it("dispatch wrapper unwrapping preserves inner args", () => {
-    if (process.platform === "win32") return;
+    if (process.platform === "win32") {
+      return;
+    }
     const dir = makeTempDir();
     const python3 = makeExecutable(dir, "python3");
     const entries = resolveAllowAlwaysPatterns({
@@ -186,7 +190,9 @@ describe("exact-match with shell wrapper unwrapping", () => {
   });
 
   it("chain (&&) creates separate exact entries per segment", () => {
-    if (process.platform === "win32") return;
+    if (process.platform === "win32") {
+      return;
+    }
     const dir = makeTempDir();
     const python3 = makeExecutable(dir, "python3");
     const rg = makeExecutable(dir, "rg");
@@ -272,7 +278,9 @@ describe("exact-match integration with evaluateShellAllowlist", () => {
   }
 
   it("python3 safe.py allow-always does NOT approve python3 evil.py", () => {
-    if (process.platform === "win32") return;
+    if (process.platform === "win32") {
+      return;
+    }
     const dir = makeTempDir();
     const python3 = makeExecutable(dir, "python3");
     const env = makePathEnv(dir);

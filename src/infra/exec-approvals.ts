@@ -514,17 +514,25 @@ export function recordAllowlistUse(
   const agents = approvals.agents ?? {};
   const existing = agents[target] ?? {};
   const allowlist = Array.isArray(existing.allowlist) ? existing.allowlist : [];
-  const nextAllowlist = allowlist.map((item) =>
-    item.pattern === entry.pattern
-      ? {
-          ...item,
-          id: item.id ?? crypto.randomUUID(),
-          lastUsedAt: Date.now(),
-          lastUsedCommand: command,
-          lastResolvedPath: resolvedPath,
-        }
-      : item,
-  );
+  // Match on pattern+args identity so that distinct exact-match entries
+  // (e.g. `python3 safe.py` vs `python3 other.py`) update independently.
+  const entryArgsKey = entry.args != null ? JSON.stringify(entry.args) : null;
+  const nextAllowlist = allowlist.map((item) => {
+    if (item.pattern !== entry.pattern) {
+      return item;
+    }
+    const itemArgsKey = item.args != null ? JSON.stringify(item.args) : null;
+    if (itemArgsKey !== entryArgsKey) {
+      return item;
+    }
+    return {
+      ...item,
+      id: item.id ?? crypto.randomUUID(),
+      lastUsedAt: Date.now(),
+      lastUsedCommand: command,
+      lastResolvedPath: resolvedPath,
+    };
+  });
   agents[target] = { ...existing, allowlist: nextAllowlist };
   approvals.agents = agents;
   saveExecApprovals(approvals);
