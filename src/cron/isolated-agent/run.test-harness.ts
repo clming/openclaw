@@ -421,7 +421,7 @@ export function resetRunCronIsolatedAgentTurnHarness(): void {
   });
 
   deliverOutboundPayloadsMock.mockReset();
-  deliverOutboundPayloadsMock.mockResolvedValue(undefined);
+  deliverOutboundPayloadsMock.mockResolvedValue([]);
 
   logWarnMock.mockReset();
 }
