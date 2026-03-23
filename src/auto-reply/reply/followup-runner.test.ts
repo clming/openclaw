@@ -5,10 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "../../config/sessions/types.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 
-const runEmbeddedPiAgentMock = vi.fn();
-const routeReplyMock = vi.fn();
-const isRoutableChannelMock = vi.fn();
-const applyMediaUnderstandingMock = vi.fn();
+const {
+  runEmbeddedPiAgentMock,
+  routeReplyMock,
+  isRoutableChannelMock,
+  applyMediaUnderstandingMock,
+} = vi.hoisted(() => ({
+  runEmbeddedPiAgentMock: vi.fn(),
+  routeReplyMock: vi.fn(),
+  isRoutableChannelMock: vi.fn(),
+  applyMediaUnderstandingMock: vi.fn(),
+}));
 
 let createFollowupRunner: typeof import("./followup-runner.js").createFollowupRunner;
 let loadSessionStore: typeof import("../../config/sessions/store.js").loadSessionStore;
@@ -223,9 +230,6 @@ async function loadFreshFollowupRunnerModuleForTest() {
     persistRunSessionUsage: persistRunSessionUsageForFollowupTest,
     incrementRunCompactionCount: incrementRunCompactionCountForFollowupTest,
   }));
-  vi.doMock("../../media-understanding/apply.js", () => ({
-    applyMediaUnderstanding: (params: unknown) => applyMediaUnderstandingMock(params),
-  }));
   vi.doMock("./route-reply.js", () => ({
     isRoutableChannel: (...args: unknown[]) => isRoutableChannelMock(...args),
     routeReply: (...args: unknown[]) => routeReplyMock(...args),
@@ -237,6 +241,15 @@ async function loadFreshFollowupRunnerModuleForTest() {
   ({ createMockFollowupRun, createMockTypingController } = await import("./test-helpers.js"));
   ({ buildCollectPrompt } = await import("../../utils/queue-helpers.js"));
   ({ applyDeferredMediaToQueuedRuns, buildMediaAwareQueueSummaryPrompt } = await import("./queue/drain.js"));
+
+  // vi.doMock does not intercept transitive ESM imports in the forks pool, so
+  // we use vi.spyOn on the module namespace instead.  ESM live bindings read
+  // through the namespace getter, so the spy propagates to followup-media.ts's
+  // import of applyMediaUnderstanding.
+  const applyMod = await import("../../media-understanding/apply.js");
+  vi.spyOn(applyMod, "applyMediaUnderstanding").mockImplementation((...args: unknown[]) =>
+    applyMediaUnderstandingMock(...args),
+  );
 }
 
 const ROUTABLE_TEST_CHANNELS = new Set([

@@ -20,7 +20,6 @@ import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { resolveRunAuthProfile } from "./agent-runner-utils.js";
-import { parseInlineDirectives } from "./directive-handling.js";
 import { applyDeferredMediaUnderstandingToQueuedRun } from "./followup-media.js";
 import {
   resolveOriginAccountId,
@@ -40,112 +39,6 @@ import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-r
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
-const MEDIA_ONLY_PLACEHOLDER = "[User sent media without caption]";
-const MEDIA_REPLY_HINT_PREFIX = "To send an image back, prefer the message tool";
-const LEADING_MEDIA_ATTACHED_LINE_RE = /^\[media attached(?: \d+\/\d+)?: [^\r\n]*\]$/;
-const FILE_BLOCK_RE = /<file\s+name="/i;
-
-function stripLeadingMediaAttachedLines(prompt: string): string {
-  const lines = prompt.split("\n");
-  let index = 0;
-  while (index < lines.length) {
-    const trimmed = lines[index]?.trim() ?? "";
-    if (!LEADING_MEDIA_ATTACHED_LINE_RE.test(trimmed)) {
-      break;
-    }
-    index += 1;
-  }
-  return lines.slice(index).join("\n").trim();
-}
-
-function stripLeadingMediaReplyHint(prompt: string): string {
-  const lines = prompt.split("\n");
-  if ((lines[0] ?? "").startsWith(MEDIA_REPLY_HINT_PREFIX)) {
-    return lines.slice(1).join("\n").trim();
-  }
-  return prompt.trim();
-}
-
-function replaceLastOccurrence(
-  value: string,
-  search: string,
-  replacement: string,
-): string | undefined {
-  if (!search) {
-    return undefined;
-  }
-  const index = value.lastIndexOf(search);
-  if (index < 0) {
-    return undefined;
-  }
-  return `${value.slice(0, index)}${replacement}${value.slice(index + search.length)}`;
-}
-
-function stripInlineDirectives(text: string | undefined): string {
-  return parseInlineDirectives(text ?? "").cleaned.trim();
-}
-
-function normalizeUpdatedBody(params: { originalBody?: string; updatedBody?: string }): string {
-  const updatedBody = params.updatedBody?.trim();
-  if (!updatedBody) {
-    return "";
-  }
-  const originalBody = params.originalBody?.trim();
-  if (!originalBody) {
-    return updatedBody;
-  }
-
-  const cleanedOriginalBody = stripInlineDirectives(originalBody);
-  if (!cleanedOriginalBody) {
-    return updatedBody;
-  }
-  if (updatedBody === originalBody) {
-    return cleanedOriginalBody;
-  }
-  return (
-    replaceLastOccurrence(updatedBody, originalBody, cleanedOriginalBody) ?? updatedBody
-  ).trim();
-}
-
-function rebuildQueuedPromptWithMediaUnderstanding(params: {
-  prompt: string;
-  originalBody?: string;
-  updatedBody?: string;
-  mediaNote?: string;
-}): string {
-  let stripped = stripLeadingMediaAttachedLines(params.prompt);
-  if (!params.mediaNote) {
-    stripped = stripLeadingMediaReplyHint(stripped);
-  }
-
-  const updatedBody = normalizeUpdatedBody({
-    originalBody: params.originalBody,
-    updatedBody: params.updatedBody,
-  });
-  if (!updatedBody) {
-    return [params.mediaNote?.trim(), stripped].filter(Boolean).join("\n").trim();
-  }
-
-  const replacementTargets = [
-    params.originalBody?.trim(),
-    stripInlineDirectives(params.originalBody),
-    MEDIA_ONLY_PLACEHOLDER,
-  ].filter(
-    (value, index, list): value is string => Boolean(value) && list.indexOf(value) === index,
-  );
-
-  let rebuilt = stripped;
-  for (const target of replacementTargets) {
-    const replaced = replaceLastOccurrence(rebuilt, target, updatedBody);
-    if (replaced !== undefined) {
-      rebuilt = replaced;
-      return [params.mediaNote?.trim(), rebuilt.trim()].filter(Boolean).join("\n").trim();
-    }
-  }
-
-  rebuilt = [rebuilt, updatedBody].filter(Boolean).join("\n\n");
-  return [params.mediaNote?.trim(), rebuilt.trim()].filter(Boolean).join("\n").trim();
-}
 export function createFollowupRunner(params: {
   opts?: GetReplyOptions;
   typing: TypingController;
