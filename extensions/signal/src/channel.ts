@@ -460,7 +460,10 @@ export const signalPlugin: ChannelPlugin<ResolvedSignalAccount, SignalProbe> =
             ? [ctx.payload.mediaUrl]
             : [];
         if (!text && urls.length === 0) {
-          return { channel: "signal", messageId: "" };
+          // Interactive-only payload (e.g. buttons, channelData) has no text or
+          // media that Signal can send. Return a no-op result so the caller knows
+          // the payload was intentionally skipped rather than silently lost.
+          return { channel: "signal" as const, messageId: "", meta: { skipped: true } };
         }
         if (urls.length > 0) {
           let lastResult: { channel: string; messageId: string } | undefined;
@@ -525,3 +528,4 @@ export const signalPlugin: ChannelPlugin<ResolvedSignalAccount, SignalProbe> =
       },
     },
   });
+
