@@ -62,10 +62,16 @@ function digestBase64Payload(data: string): string {
 
 /**
  * Credential field names to redact from diagnostic objects.
+ *
+ * Note: "token" is intentionally included to catch generic auth token fields,
+ * though it may also match non-sensitive tokens (pagination, CSRF). The security
+ * benefit of catching auth tokens outweighs the risk of over-redacting diagnostic
+ * fields. More specific fields (apiKey, bearerToken, accessToken, etc.) are listed
+ * separately for comprehensive coverage.
  */
 const CREDENTIAL_FIELDS = [
   "apiKey",
-  "token",
+  "token", // Generic auth token (intentionally broad for security coverage)
   "password",
   "secretKey",
   "authorization",
