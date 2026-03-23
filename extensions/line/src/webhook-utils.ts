@@ -1,5 +1,5 @@
 import type { WebhookRequestBody } from "@line/bot-sdk";
-export { validateLineSignature } from "./signature.js";
+import { validateSignature } from "@line/bot-sdk";
 
 export function parseLineWebhookBody(rawBody: string): WebhookRequestBody | null {
   try {
@@ -7,4 +7,12 @@ export function parseLineWebhookBody(rawBody: string): WebhookRequestBody | null
   } catch {
     return null;
   }
+}
+
+export function validateLineSignature(
+  rawBody: string,
+  signature: string,
+  channelSecret: string,
+): boolean {
+  return validateSignature(rawBody, channelSecret, signature);
 }

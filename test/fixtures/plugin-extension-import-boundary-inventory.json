@@ -1,1 +1,50 @@
-[]
+[
+  {
+    "file": "src/plugins/provider-auth-storage.ts",
+    "line": 1,
+    "kind": "import",
+    "specifier": "../../extensions/kilocode/shared.js",
+    "resolvedPath": "extensions/kilocode/shared.js",
+    "reason": "imports extension-owned file from src/plugins"
+  },
+  {
+    "file": "src/plugins/provider-model-definitions.ts",
+    "line": 7,
+    "kind": "import",
+    "specifier": "../../extensions/kilocode/shared.js",
+    "resolvedPath": "extensions/kilocode/shared.js",
+    "reason": "imports extension-owned file from src/plugins"
+  },
+  {
+    "file": "src/plugins/runtime/runtime-channel.ts",
+    "line": 17,
+    "kind": "import",
+    "specifier": "../../../extensions/line/runtime-api.js",
+    "resolvedPath": "extensions/line/runtime-api.js",
+    "reason": "imports extension-owned file from src/plugins"
+  },
+  {
+    "file": "src/plugins/runtime/runtime-line.runtime.ts",
+    "line": 1,
+    "kind": "export",
+    "specifier": "../../../extensions/line/src/monitor.js",
+    "resolvedPath": "extensions/line/src/monitor.js",
+    "reason": "re-exports extension implementation from src/plugins"
+  },
+  {
+    "file": "src/plugins/runtime/runtime-line.runtime.ts",
+    "line": 2,
+    "kind": "export",
+    "specifier": "../../../extensions/line/src/probe.js",
+    "resolvedPath": "extensions/line/src/probe.js",
+    "reason": "re-exports extension implementation from src/plugins"
+  },
+  {
+    "file": "src/plugins/runtime/runtime-line.runtime.ts",
+    "line": 11,
+    "kind": "export",
+    "specifier": "../../../extensions/line/src/send.js",
+    "resolvedPath": "extensions/line/src/send.js",
+    "reason": "re-exports extension implementation from src/plugins"
+  }
+]

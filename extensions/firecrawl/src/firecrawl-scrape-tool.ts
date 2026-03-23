@@ -1,5 +1,9 @@
 import { Type } from "@sinclair/typebox";
-import { jsonResult, readNumberParam, readStringParam } from "openclaw/plugin-sdk/agent-runtime";
+import {
+  jsonResult,
+  readNumberParam,
+  readStringParam,
+} from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-runtime";
 import { runFirecrawlScrape } from "./firecrawl-client.js";
 
@@ -15,7 +19,6 @@ function optionalStringEnum<const T extends readonly string[]>(
     }),
   );
 }
-
 const FirecrawlScrapeToolSchema = Type.Object(
   {
     url: Type.String({ description: "HTTP or HTTPS URL to scrape via Firecrawl." }),

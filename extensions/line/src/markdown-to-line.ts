@@ -3,6 +3,8 @@ import { stripMarkdown } from "openclaw/plugin-sdk/text-runtime";
 import { createReceiptCard, toFlexMessage, type FlexBubble } from "./flex-templates.js";
 export { stripMarkdown } from "openclaw/plugin-sdk/text-runtime";
 
+export { stripMarkdown };
+
 type FlexMessage = messagingApi.FlexMessage;
 type FlexComponent = messagingApi.FlexComponent;
 type FlexText = messagingApi.FlexText;
