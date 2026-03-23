@@ -3,7 +3,7 @@ import { hasControlCommand } from "openclaw/plugin-sdk/command-auth";
 import type { loadConfig } from "openclaw/plugin-sdk/config-runtime";
 import { recordPendingHistoryEntryIfEnabled } from "openclaw/plugin-sdk/reply-history";
 import { parseActivationCommand } from "openclaw/plugin-sdk/reply-runtime";
-import { normalizeE164 } from "openclaw/plugin-sdk/text-runtime";
+import { isSelfChatMode, normalizeE164 } from "openclaw/plugin-sdk/text-runtime";
 import type { MentionConfig } from "../mentions.js";
 import { buildMentionConfig, debugMention, resolveOwnerList } from "../mentions.js";
 import type { WebInboundMsg } from "../types.js";
@@ -133,7 +133,8 @@ export function applyGroupGating(params: ApplyGroupGatingParams) {
   const replySenderE164 = params.msg.replyToSenderE164
     ? normalizeE164(params.msg.replyToSenderE164)
     : null;
-  const implicitMention = Boolean(
+  const isSelfPhone = isSelfChatMode(selfE164, mentionConfig.allowFrom);
+  const implicitMention = !isSelfPhone && Boolean(
     (selfJid && replySenderJid && selfJid === replySenderJid) ||
     (selfE164 && replySenderE164 && selfE164 === replySenderE164),
   );
