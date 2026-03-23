@@ -21,6 +21,10 @@ const GROUP_NAME_TTL_MS = 10 * 60 * 1000;
 const senderNameCache = new Map<string, { name: string; expireAt: number }>();
 const groupNameCache = new Map<string, { name?: string; expireAt: number }>();
 
+function buildSenderCacheKey(accountId: string, senderId: string): string {
+  return `${accountId}:${senderId}`;
+}
+
 function correctFeishuScopeInUrl(url: string): string {
   let corrected = url;
   for (const [wrong, right] of Object.entries(FEISHU_SCOPE_CORRECTIONS)) {
@@ -88,7 +92,7 @@ export async function resolveFeishuSenderName(params: {
 
   const now = Date.now();
   for (const candidateId of candidateIds) {
-    const cached = senderNameCache.get(candidateId);
+    const cached = senderNameCache.get(buildSenderCacheKey(account.accountId, candidateId));
     if (cached && cached.expireAt > now) {
       return { name: cached.name };
     }
@@ -125,7 +129,10 @@ export async function resolveFeishuSenderName(params: {
         res?.data?.user?.en_name;
       if (name && typeof name === "string") {
         for (const idForCache of candidateIds) {
-          senderNameCache.set(idForCache, { name, expireAt: now + SENDER_NAME_TTL_MS });
+          senderNameCache.set(buildSenderCacheKey(account.accountId, idForCache), {
+            name,
+            expireAt: now + SENDER_NAME_TTL_MS,
+          });
         }
         return { name };
       }
@@ -217,7 +224,9 @@ export async function resolveFeishuDirectNameFromChatMember(params: {
     return undefined;
   }
 
-  const cached = senderNameCache.get(normalizedSenderOpenId);
+  const cached = senderNameCache.get(
+    buildSenderCacheKey(account.accountId, normalizedSenderOpenId),
+  );
   const now = Date.now();
   if (cached && cached.expireAt > now) {
     return cached.name;
@@ -249,7 +258,10 @@ export async function resolveFeishuDirectNameFromChatMember(params: {
       : undefined;
     const name = typeof item?.name === "string" ? item.name.trim() : "";
     if (name) {
-      senderNameCache.set(normalizedSenderOpenId, { name, expireAt: now + SENDER_NAME_TTL_MS });
+      senderNameCache.set(buildSenderCacheKey(account.accountId, normalizedSenderOpenId), {
+        name,
+        expireAt: now + SENDER_NAME_TTL_MS,
+      });
       return name;
     }
   } catch (err) {
