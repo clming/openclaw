@@ -1,15 +1,11 @@
 import { Type } from "@sinclair/typebox";
-import {
-  jsonResult,
-  readNumberParam,
-  readStringParam,
-} from "openclaw/plugin-sdk/agent-runtime";
+import { jsonResult, readNumberParam, readStringParam } from "openclaw/plugin-sdk/agent-runtime";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-runtime";
 import { runTavilySearch } from "./tavily-client.js";
 
-function optionalStringEnum<const T extends readonly string[]>(
+function optionalStringEnum<T extends readonly string[]>(
   values: T,
-  options: { description?: string } = {},
+  options: { description?: string; title?: string; default?: T[number] } = {},
 ) {
   return Type.Optional(
     Type.Unsafe<T[number]>({
