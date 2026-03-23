@@ -3,13 +3,11 @@ import type { AuthProfileStore } from "./auth-profiles/types.js";
 
 const mocks = vi.hoisted(() => ({
   readCodexCliCredentialsCached: vi.fn(),
-  readQwenCliCredentialsCached: vi.fn(() => null),
   readMiniMaxCliCredentialsCached: vi.fn(() => null),
 }));
 
 vi.mock("./cli-credentials.js", () => ({
   readCodexCliCredentialsCached: mocks.readCodexCliCredentialsCached,
-  readQwenCliCredentialsCached: mocks.readQwenCliCredentialsCached,
   readMiniMaxCliCredentialsCached: mocks.readMiniMaxCliCredentialsCached,
 }));
 

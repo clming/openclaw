@@ -60,7 +60,7 @@ function syncExternalCliCredentialsForProvider(
 }
 
 /**
- * Sync OAuth credentials from external CLI tools (Qwen Code CLI, MiniMax CLI, Codex CLI)
+ * Sync OAuth credentials from external CLI tools (MiniMax CLI, Codex CLI)
  * into the store.
  *
  * Returns true if any credentials were updated.
