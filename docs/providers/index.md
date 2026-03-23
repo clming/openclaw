@@ -46,7 +46,7 @@ Looking for chat channel docs (WhatsApp/Telegram/Discord/Slack/Mattermost (plugi
 - [OpenRouter](/providers/openrouter)
 - [Perplexity (web search)](/providers/perplexity-provider)
 - [Qianfan](/providers/qianfan)
-- [Qwen (OAuth)](/providers/qwen)
+- [Qwen (→ Model Studio)](/providers/qwen)
 - [SGLang (local models)](/providers/sglang)
 - [Together AI](/providers/together)
 - [Vercel AI Gateway](/providers/vercel-ai-gateway)

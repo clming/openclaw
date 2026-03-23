@@ -1,14 +1,8 @@
 import {
   readCodexCliCredentialsCached,
-  readQwenCliCredentialsCached,
   readMiniMaxCliCredentialsCached,
 } from "../cli-credentials.js";
-import {
-  EXTERNAL_CLI_SYNC_TTL_MS,
-  QWEN_CLI_PROFILE_ID,
-  MINIMAX_CLI_PROFILE_ID,
-  log,
-} from "./constants.js";
+import { EXTERNAL_CLI_SYNC_TTL_MS, MINIMAX_CLI_PROFILE_ID, log } from "./constants.js";
 import type { AuthProfileStore, OAuthCredential } from "./types.js";
 
 const OPENAI_CODEX_DEFAULT_PROFILE_ID = "openai-codex:default";
@@ -77,17 +71,6 @@ export function syncExternalCliCredentials(
 ): boolean {
   let mutated = false;
 
-  if (
-    syncExternalCliCredentialsForProvider(
-      store,
-      QWEN_CLI_PROFILE_ID,
-      "qwen-portal",
-      () => readQwenCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS }),
-      options,
-    )
-  ) {
-    mutated = true;
-  }
   if (
     syncExternalCliCredentialsForProvider(
       store,
