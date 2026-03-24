@@ -2226,7 +2226,7 @@ install_gateway_daemon_if_needed() {
         ui_info "Skipping gateway daemon installation (SKIP_GATEWAY_DAEMON=1)"
         return 0
     fi
-    
+
     local claw="${OPENCLAW_BIN:-}"
     if [[ -z "$claw" ]]; then
         claw="$(resolve_openclaw_bin || true)"
