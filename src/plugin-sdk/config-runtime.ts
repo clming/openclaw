@@ -76,6 +76,7 @@ export type {
   TtsConfig,
 } from "../config/types.js";
 export {
+  appendAssistantMessageToSessionTranscript,
   loadSessionStore,
   readSessionUpdatedAt,
   recordSessionMetaFromInbound,
