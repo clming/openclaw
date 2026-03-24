@@ -630,7 +630,7 @@ describe("monitorDiscordProvider", () => {
     const { monitorDiscordProvider } = await import("./provider.js");
     const runtime = baseRuntime();
 
-    clientFetchUserMock.mockResolvedValueOnce({ id: undefined as unknown as string, username: "NoId" });
+    clientFetchUserMock.mockResolvedValueOnce({ id: undefined as unknown as string });
 
     await expect(
       monitorDiscordProvider({
