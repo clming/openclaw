@@ -182,7 +182,11 @@ function createParallelToolCallsWrapper(
 ): StreamFn {
   const underlying = baseStreamFn ?? streamSimple;
   return (model, context, options) => {
-    if (model.api !== "openai-completions" && model.api !== "openai-responses") {
+    if (
+      model.api !== "openai-completions" &&
+      model.api !== "openai-responses" &&
+      model.api !== "openai-codex-responses"
+    ) {
       return underlying(model, context, options);
     }
     log.debug(
@@ -201,6 +205,13 @@ function createParallelToolCallsWrapper(
   };
 }
 
+function resolveDefaultParallelToolCalls(provider: string, modelApi?: string): boolean | undefined {
+  // Codex workloads are dominated by tool-heavy coding loops. Defaulting
+  // parallel_tool_calls on reduces serialized read/exec round-trips unless the
+  // user explicitly overrides it for a model or agent.
+  return provider === "openai-codex" && modelApi === "openai-codex-responses" ? true : undefined;
+}
+
 /**
  * Apply extra params (like temperature) to an agent's streamFn.
  * Also applies verified provider-specific request wrappers, such as OpenRouter attribution.
@@ -216,6 +227,7 @@ export function applyExtraParamsToAgent(
   thinkingLevel?: ThinkLevel,
   agentId?: string,
   workspaceDir?: string,
+  modelApi?: string,
 ): void {
   const resolvedExtraParams = resolveExtraParams({
     cfg,
@@ -358,16 +370,20 @@ export function applyExtraParamsToAgent(
     "parallel_tool_calls",
     "parallelToolCalls",
   );
-  if (rawParallelToolCalls !== undefined) {
-    if (typeof rawParallelToolCalls === "boolean") {
-      agent.streamFn = createParallelToolCallsWrapper(agent.streamFn, rawParallelToolCalls);
-    } else if (rawParallelToolCalls === null) {
+  const resolvedParallelToolCalls =
+    rawParallelToolCalls === undefined
+      ? resolveDefaultParallelToolCalls(provider, modelApi)
+      : rawParallelToolCalls;
+  if (resolvedParallelToolCalls !== undefined) {
+    if (typeof resolvedParallelToolCalls === "boolean") {
+      agent.streamFn = createParallelToolCallsWrapper(agent.streamFn, resolvedParallelToolCalls);
+    } else if (resolvedParallelToolCalls === null) {
       log.debug("parallel_tool_calls suppressed by null override, skipping injection");
     } else {
       const summary =
-        typeof rawParallelToolCalls === "string"
-          ? rawParallelToolCalls
-          : typeof rawParallelToolCalls;
+        typeof resolvedParallelToolCalls === "string"
+          ? resolvedParallelToolCalls
+          : typeof resolvedParallelToolCalls;
       log.warn(`ignoring invalid parallel_tool_calls param: ${summary}`);
     }
   }
