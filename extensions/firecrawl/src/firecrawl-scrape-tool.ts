@@ -3,9 +3,9 @@ import { jsonResult, readNumberParam, readStringParam } from "openclaw/plugin-sd
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-runtime";
 import { runFirecrawlScrape } from "./firecrawl-client.js";
 
-function optionalStringEnum<const T extends readonly string[]>(
+function optionalStringEnum<T extends readonly string[]>(
   values: T,
-  options: { description?: string } = {},
+  options: { description?: string; title?: string; default?: T[number] } = {},
 ) {
   return Type.Optional(
     Type.Unsafe<T[number]>({
@@ -15,7 +15,6 @@ function optionalStringEnum<const T extends readonly string[]>(
     }),
   );
 }
-
 const FirecrawlScrapeToolSchema = Type.Object(
   {
     url: Type.String({ description: "HTTP or HTTPS URL to scrape via Firecrawl." }),

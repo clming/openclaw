@@ -8,7 +8,7 @@ describe("googlechatPlugin security", () => {
     if (!security) {
       throw new Error("googlechat security unavailable");
     }
-    const resolveDmPolicy = security.resolveDmPolicy;
+    const resolveDmPolicy = security.resolveDmPolicy!;
     const normalizeAllowEntry = googlechatPlugin.pairing?.normalizeAllowEntry;
     expect(resolveDmPolicy).toBeTypeOf("function");
     expect(normalizeAllowEntry).toBeTypeOf("function");
@@ -26,7 +26,7 @@ describe("googlechatPlugin security", () => {
     } as OpenClawConfig;
 
     const account = googlechatPlugin.config.resolveAccount(cfg, "default");
-    const resolved = resolveDmPolicy!({ cfg, account });
+    const resolved = resolveDmPolicy({ cfg, account });
     if (!resolved) {
       throw new Error("googlechat resolveDmPolicy returned null");
     }
@@ -36,6 +36,6 @@ describe("googlechatPlugin security", () => {
     expect(resolved.normalizeEntry?.("  googlechat:user:Bob@Example.com  ")).toBe(
       "bob@example.com",
     );
-    expect(normalizeAllowEntry!("  users/Alice@Example.com  ")).toBe("alice@example.com");
+    expect(normalizeAllowEntry?.("  users/Alice@Example.com  ")).toBe("alice@example.com");
   });
 });

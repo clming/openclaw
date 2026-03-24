@@ -38,7 +38,7 @@ export type {
   LineConfig,
   ResolvedLineAccount,
 } from "../../extensions/line/api.js";
-export type { LineProbeResult } from "../../extensions/line/api.js";
+export type { LineProbeResult } from "../../extensions/line/src/types.js";
 export {
   createActionCard,
   createAgendaCard,

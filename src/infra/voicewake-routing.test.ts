@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import {
+  normalizeVoiceWakeRoutingConfig,
+  normalizeVoiceWakeTriggerWord,
+  resolveVoiceWakeRouteByTrigger,
+  validateVoiceWakeRoutingConfigInput,
+} from "./voicewake-routing.js";
+
+describe("voicewake routing normalization", () => {
+  it("normalizes punctuation-heavy triggers to token-equivalent spacing", () => {
+    expect(normalizeVoiceWakeTriggerWord("  Hey,   Bot!!  ")).toBe("hey bot");
+  });
+
+  it("normalizes agentId targets before persisting routes", () => {
+    const normalized = normalizeVoiceWakeRoutingConfig({
+      defaultTarget: { mode: "current" },
+      routes: [{ trigger: "Wake", target: { agentId: " Main Agent " } }],
+    });
+    expect(normalized.routes).toHaveLength(1);
+    expect(normalized.routes[0]?.target).toEqual({ agentId: "main-agent" });
+  });
+
+  it("resolves trigger routing with punctuation-insensitive trigger values", () => {
+    const config = normalizeVoiceWakeRoutingConfig({
+      defaultTarget: { mode: "current" },
+      routes: [{ trigger: "Hey, Bot", target: { sessionKey: "agent:main:voice" } }],
+    });
+    expect(resolveVoiceWakeRouteByTrigger({ trigger: "hey bot", config })).toEqual({
+      sessionKey: "agent:main:voice",
+    });
+  });
+
+  it("rejects invalid route agent ids instead of normalizing them to main", () => {
+    expect(
+      validateVoiceWakeRoutingConfigInput({
+        routes: [{ trigger: "wake", target: { agentId: "!!!" } }],
+      }),
+    ).toEqual({
+      ok: false,
+      message: "config.routes[0].target.agentId must be a valid agent id",
+    });
+  });
+
+  it("rejects malformed session keys instead of persisting dead routes", () => {
+    expect(
+      validateVoiceWakeRoutingConfigInput({
+        routes: [{ trigger: "wake", target: { sessionKey: "agent::main" } }],
+      }),
+    ).toEqual({
+      ok: false,
+      message: "config.routes[0].target.sessionKey must be a canonical agent session key",
+    });
+  });
+});
