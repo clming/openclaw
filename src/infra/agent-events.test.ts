@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
+import type { AgentEventPayload } from "./agent-events.js";
 import {
   clearAgentRunContext,
   emitAgentEvent,
@@ -189,5 +190,27 @@ describe("agent-events sequencing", () => {
     ]);
 
     first.resetAgentEventsForTest();
+  });
+
+  it("clearAgentRunContext also removes seqByRun entry", () => {
+    // Emit an event to create a seqByRun entry
+    emitAgentEvent({ runId: "run-seq-cleanup", stream: "lifecycle", data: {} });
+    // Verify it was tracked
+    emitAgentEvent({ runId: "run-seq-cleanup", stream: "lifecycle", data: {} });
+    const events: AgentEventPayload[] = [];
+    const unsub = onAgentEvent((e) => events.push(e));
+    emitAgentEvent({ runId: "run-seq-cleanup", stream: "lifecycle", data: {} });
+    expect(events[0].seq).toBe(3); // was incremented
+
+    // Clear the run context — should also clear seqByRun
+    clearAgentRunContext("run-seq-cleanup");
+
+    // Next emit for same runId should start from seq 1 again
+    emitAgentEvent({ runId: "run-seq-cleanup", stream: "lifecycle", data: {} });
+    expect(events[1].seq).toBe(1); // reset after cleanup
+    unsub();
+
+    // Clean up the re-created seqByRun entry so it doesn't leak across tests
+    clearAgentRunContext("run-seq-cleanup");
   });
 });
