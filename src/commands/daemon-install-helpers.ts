@@ -33,12 +33,12 @@ function readDurableStateEnvKeys(env: Record<string, string | undefined>): Set<s
   try {
     const parsed = dotenv.parse(fs.readFileSync(envPath, "utf8"));
     // Only skip keys that have a usable durable value — exclude empty values
-    // and unresolved shell-variable placeholders like ${OPENAI_API_KEY} or
-    // $OPENAI_API_KEY, which dotenv stores literally without expansion.
+    // and any $-prefixed expression that dotenv stores literally without
+    // expansion (e.g. $VAR, ${VAR}, ${VAR:-fallback}, ${VAR-default}).
     return new Set(
       Object.keys(parsed).filter((k) => {
         const v = parsed[k].trim();
-        return v !== "" && !/^\$\{[^}]+\}$/.test(v) && !/^\$[A-Za-z_][A-Za-z0-9_]*$/.test(v);
+        return v !== "" && !v.startsWith("$");
       }),
     );
   } catch {

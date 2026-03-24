@@ -267,10 +267,11 @@ describe("buildGatewayInstallPlan", () => {
     mockNodeGatewayPlanFixture({ serviceEnvironment: { OPENCLAW_PORT: "3000" } });
     stateDirForTest = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-state-"));
     process.env.OPENCLAW_STATE_DIR = stateDirForTest;
-    // dotenv stores ${VAR} literally — should NOT be treated as a usable durable value.
+    // dotenv stores $-expressions literally — should NOT be treated as usable durable values.
+    // Covers ${VAR}, $VAR, ${VAR:-fallback}, ${VAR-default}, etc.
     fs.writeFileSync(
       path.join(stateDirForTest, ".env"),
-      "OPENAI_API_KEY=${OPENAI_API_KEY}\n",
+      "OPENAI_API_KEY=${OPENAI_API_KEY:-fallback}\n",
       "utf8",
     );
     mocks.loadAuthProfileStoreForSecretsRuntime.mockReturnValue({
