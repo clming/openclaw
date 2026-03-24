@@ -71,6 +71,7 @@ import {
   DiscordReactionListener,
   DiscordReactionRemoveListener,
   DiscordThreadUpdateListener,
+  DiscordTypingListener,
   registerDiscordListener,
 } from "./listeners.js";
 import {
@@ -984,6 +985,19 @@ export async function monitorDiscordProvider(opts: MonitorDiscordOpts = {}) {
       client.listeners,
       new DiscordThreadUpdateListener(cfg, account.accountId, logger),
     );
+
+    if (discordCfg.intents?.typingIndicator) {
+      registerDiscordListener(
+        client.listeners,
+        new DiscordTypingListener({
+          logger,
+          accountId: account.accountId,
+          cfg,
+          botUserId,
+        }),
+      );
+      runtime.log?.("discord: GuildMessageTyping intent enabled — typing listener registered");
+    }
 
     if (discordCfg.intents?.presence) {
       registerDiscordListener(
