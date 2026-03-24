@@ -220,4 +220,45 @@ describe("sendDiscordComponentMessage", () => {
     expect(buildComponentTranscriptText({})).toBe("");
     expect(buildComponentTranscriptText({ blocks: [{ type: "separator" }] })).toBe("");
   });
+
+  it("buildComponentTranscriptText includes section accessory button labels", () => {
+    const text = buildComponentTranscriptText({
+      blocks: [
+        {
+          type: "section",
+          text: "Order #1234",
+          accessory: { type: "button", button: { label: "View details" } },
+        },
+      ],
+    });
+
+    expect(text).toBe("Order #1234\n[View details]");
+  });
+
+  it("buildComponentTranscriptText includes modal trigger label", () => {
+    const text = buildComponentTranscriptText({
+      text: "Submit your feedback",
+      modal: {
+        title: "Feedback form",
+        triggerLabel: "Open form",
+        fields: [{ type: "text", name: "comment", label: "Comment" }],
+      },
+    });
+
+    expect(text).toBe("Submit your feedback\n[Open form]");
+  });
+
+  it("buildComponentTranscriptText omits section thumbnail accessories", () => {
+    const text = buildComponentTranscriptText({
+      blocks: [
+        {
+          type: "section",
+          text: "Product info",
+          accessory: { type: "thumbnail", url: "https://example.com/img.png" },
+        },
+      ],
+    });
+
+    expect(text).toBe("Product info");
+  });
 });

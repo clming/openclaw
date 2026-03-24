@@ -61,6 +61,9 @@ export function buildComponentTranscriptText(spec: DiscordComponentMessageSpec):
         for (const t of block.texts ?? []) {
           if (t?.trim()) parts.push(t.trim());
         }
+        if (block.accessory?.type === "button" && block.accessory.button.label) {
+          parts.push(`[${block.accessory.button.label}]`);
+        }
         break;
       case "actions":
         if (block.buttons?.length) {
@@ -75,7 +78,14 @@ export function buildComponentTranscriptText(spec: DiscordComponentMessageSpec):
           }
         }
         break;
+      // media-gallery, file, and separator blocks carry no meaningful text
+      // content, so they are intentionally omitted from the transcript summary.
+      default:
+        break;
     }
+  }
+  if (spec.modal?.triggerLabel?.trim()) {
+    parts.push(`[${spec.modal.triggerLabel.trim()}]`);
   }
   return parts.join("\n");
 }
@@ -238,6 +248,9 @@ export async function sendDiscordComponentMessage(
   };
 }
 
+// Edits intentionally skip transcript append — the original send already recorded the
+// message context, and an edit updates the Discord message in place without adding a
+// new conversational turn.
 export async function editDiscordComponentMessage(
   to: string,
   messageId: string,
