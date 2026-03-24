@@ -9415,6 +9415,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
                 agentId: {
                   type: "string",
                 },
+                sessionTarget: {
+                  type: "string",
+                },
                 sessionKey: {
                   type: "string",
                 },
