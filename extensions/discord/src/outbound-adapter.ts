@@ -26,25 +26,6 @@ import { buildDiscordInteractiveComponents } from "./shared-interactive.js";
 
 export const DISCORD_TEXT_CHUNK_LIMIT = 2000;
 
-function isComponentsV2Enabled(cfg?: OpenClawConfig, accountId?: string | null): boolean {
-  const discordCfg = cfg?.channels?.discord as
-    | { useComponentsV2?: boolean; accounts?: Record<string, { useComponentsV2?: boolean }> }
-    | undefined;
-  if (!discordCfg) {
-    return true;
-  }
-  if (accountId) {
-    const accountCfg = discordCfg.accounts?.[accountId];
-    if (accountCfg && typeof accountCfg.useComponentsV2 === "boolean") {
-      return accountCfg.useComponentsV2;
-    }
-  }
-  if (typeof discordCfg.useComponentsV2 === "boolean") {
-    return discordCfg.useComponentsV2;
-  }
-  return true;
-}
-
 function resolveDiscordOutboundTarget(params: {
   to: string;
   threadId?: string | number | null;
@@ -124,9 +105,8 @@ export const discordOutbound: ChannelOutboundAdapter = {
     const discordData = payload.channelData?.discord as
       | { components?: DiscordComponentMessageSpec }
       | undefined;
-    const rawComponentSpec = isComponentsV2Enabled(ctx.cfg, ctx.accountId)
-      ? (discordData?.components ?? buildDiscordInteractiveComponents(payload.interactive))
-      : undefined;
+    const rawComponentSpec =
+      discordData?.components ?? buildDiscordInteractiveComponents(payload.interactive);
     const componentSpec = rawComponentSpec
       ? rawComponentSpec.text
         ? rawComponentSpec
