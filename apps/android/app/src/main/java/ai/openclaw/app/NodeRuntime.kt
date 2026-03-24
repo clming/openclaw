@@ -24,7 +24,6 @@ import ai.openclaw.app.voice.TalkModeManager
 import ai.openclaw.app.voice.VoiceConversationEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +33,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -195,7 +193,13 @@ class NodeRuntime(
   private val _pendingGatewayTrust = MutableStateFlow<GatewayTrustPrompt?>(null)
   val pendingGatewayTrust: StateFlow<GatewayTrustPrompt?> = _pendingGatewayTrust.asStateFlow()
 
-  private val _mainSessionKey = MutableStateFlow("main")
+  private fun generateNodeSessionKey(): String {
+    val deviceId = identityStore.loadOrCreate().deviceId
+    val shortDeviceId = deviceId.take(8)
+    return "agent:main:node-$shortDeviceId"
+  }
+
+  private val _mainSessionKey = MutableStateFlow(generateNodeSessionKey())
   val mainSessionKey: StateFlow<String> = _mainSessionKey.asStateFlow()
 
   private val cameraHudSeq = AtomicLong(0)
@@ -260,7 +264,7 @@ class NodeRuntime(
         _remoteAddress.value = null
         _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
         if (!isCanonicalMainSessionKey(_mainSessionKey.value)) {
-          _mainSessionKey.value = "main"
+          _mainSessionKey.value = generateNodeSessionKey()
         }
         chat.applyMainSessionKey(resolveMainSessionKey())
         chat.onDisconnected(message)
@@ -320,7 +324,9 @@ class NodeRuntime(
       session = operatorSession,
       json = json,
       supportsChatSubscribe = false,
-    )
+    ).also {
+      it.applyMainSessionKey(_mainSessionKey.value)
+    }
   private val voiceReplySpeakerLazy: Lazy<TalkModeManager> = lazy {
     // Reuse the existing TalkMode speech engine (ElevenLabs + deterministic system-TTS fallback)
     // without enabling the legacy talk capture loop.
