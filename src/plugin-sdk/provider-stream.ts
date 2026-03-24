@@ -30,3 +30,9 @@ export {
   getOpenRouterModelCapabilities,
   loadOpenRouterModelCapabilities,
 } from "../agents/pi-embedded-runner/openrouter-model-capabilities.js";
+export {
+  ensureNovitaModelCache,
+  getAllCachedNovitaModels,
+  getNovitaModelCapabilities,
+  loadNovitaModelCapabilities,
+} from "../agents/pi-embedded-runner/novita-model-capabilities.js";

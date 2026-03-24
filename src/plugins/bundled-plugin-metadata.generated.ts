@@ -2205,6 +2205,47 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
     },
   },
   {
+    dirName: "novita",
+    idHint: "novita",
+    source: {
+      source: "./index.ts",
+      built: "index.js",
+    },
+    packageName: "@openclaw/novita-provider",
+    packageVersion: "2026.3.14",
+    packageDescription: "OpenClaw Novita AI provider plugin",
+    packageManifest: {
+      extensions: ["./index.ts"],
+    },
+    manifest: {
+      id: "novita",
+      configSchema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {},
+      },
+      providers: ["novita"],
+      providerAuthEnvVars: {
+        novita: ["NOVITA_API_KEY"],
+      },
+      providerAuthChoices: [
+        {
+          provider: "novita",
+          method: "api-key",
+          choiceId: "novita-api-key",
+          choiceLabel: "Novita AI API key",
+          groupId: "novita",
+          groupLabel: "Novita AI",
+          groupHint: "API key",
+          optionKey: "novitaApiKey",
+          cliFlag: "--novita-api-key",
+          cliOption: "--novita-api-key <key>",
+          cliDescription: "Novita AI API key",
+        },
+      ],
+    },
+  },
+  {
     dirName: "nvidia",
     idHint: "nvidia",
     source: {

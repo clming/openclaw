@@ -1,0 +1,27 @@
+{
+  "id": "novita",
+  "providers": ["novita"],
+  "providerAuthEnvVars": {
+    "novita": ["NOVITA_API_KEY"]
+  },
+  "providerAuthChoices": [
+    {
+      "provider": "novita",
+      "method": "api-key",
+      "choiceId": "novita-api-key",
+      "choiceLabel": "Novita AI API key",
+      "groupId": "novita",
+      "groupLabel": "Novita AI",
+      "groupHint": "API key",
+      "optionKey": "novitaApiKey",
+      "cliFlag": "--novita-api-key",
+      "cliOption": "--novita-api-key <key>",
+      "cliDescription": "Novita AI API key"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

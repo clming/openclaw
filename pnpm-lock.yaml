@@ -535,6 +535,8 @@ importers:
         specifier: workspace:*
         version: link:../..
 
+  extensions/novita: {}
+
   extensions/nvidia: {}
 
   extensions/ollama: {}

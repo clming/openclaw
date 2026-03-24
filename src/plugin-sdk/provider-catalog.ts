@@ -42,6 +42,7 @@ export {
 export { buildQwenPortalProvider } from "../../extensions/qwen-portal-auth/provider-catalog.js";
 export { buildSyntheticProvider } from "../../extensions/synthetic/provider-catalog.js";
 export { buildTogetherProvider } from "../../extensions/together/provider-catalog.js";
+export { buildNovitaProvider } from "../../extensions/novita/provider-catalog.js";
 export { buildVeniceProvider } from "../../extensions/venice/provider-catalog.js";
 export { buildVercelAiGatewayProvider } from "../../extensions/vercel-ai-gateway/provider-catalog.js";
 export {

@@ -91,6 +91,11 @@ export {
   DEEPSEEK_MODEL_CATALOG,
 } from "../agents/deepseek-models.js";
 export {
+  buildNovitaModelDefinition,
+  NOVITA_BASE_URL,
+  NOVITA_MODEL_CATALOG,
+} from "../agents/novita-models.js";
+export {
   buildTogetherModelDefinition,
   TOGETHER_BASE_URL,
   TOGETHER_MODEL_CATALOG,
