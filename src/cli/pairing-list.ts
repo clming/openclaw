@@ -1,32 +1,10 @@
-import { normalizeChannelId } from "../channels/plugins/index.js";
 import { listPairingChannels } from "../channels/plugins/pairing.js";
 import { resolvePairingIdLabel } from "../pairing/pairing-labels.js";
-import { listChannelPairingRequests, type PairingChannel } from "../pairing/pairing-store.js";
+import { listChannelPairingRequests } from "../pairing/pairing-store.js";
 import { defaultRuntime } from "../runtime.js";
 import { getTerminalTableWidth, renderTable } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
-
-/** Parse and validate a channel identifier against known pairing channels. */
-function parseChannel(raw: string, channels: PairingChannel[]): PairingChannel {
-  const value = raw.trim().toLowerCase();
-  if (!value) {
-    throw new Error("Channel required");
-  }
-
-  const normalized = normalizeChannelId(value);
-  if (normalized) {
-    if (!channels.includes(normalized)) {
-      throw new Error(`Channel ${normalized} does not support pairing`);
-    }
-    return normalized;
-  }
-
-  // Allow extension channels: validate format but don't require registry
-  if (/^[a-z][a-z0-9_-]{0,63}$/.test(value)) {
-    return value as PairingChannel;
-  }
-  throw new Error(`Invalid channel: ${value}`);
-}
+import { parseChannel } from "./pairing-cli.js";
 
 /**
  * Fast-route action for `openclaw pairing list`.
@@ -46,7 +24,7 @@ export async function runPairingList(opts: {
     );
   }
   const channel = parseChannel(channelRaw, channels);
-  const accountId = (opts.account ?? "").trim();
+  const accountId = String(opts.account ?? "").trim();
   const requests = accountId
     ? await listChannelPairingRequests(channel, process.env, accountId)
     : await listChannelPairingRequests(channel);

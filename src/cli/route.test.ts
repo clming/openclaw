@@ -72,6 +72,17 @@ describe("tryRouteCli", () => {
     expect(ensurePluginRegistryLoadedMock).toHaveBeenCalledWith({ scope: "channels" });
   });
 
+  it("loads plugins with channels scope for pairing commands", async () => {
+    findRoutedCommandMock.mockReturnValue({
+      loadPlugins: true,
+      run: runRouteMock,
+    });
+
+    await expect(tryRouteCli(["node", "openclaw", "pairing", "list"])).resolves.toBe(true);
+
+    expect(ensurePluginRegistryLoadedMock).toHaveBeenCalledWith({ scope: "channels" });
+  });
+
   it("routes status when root options precede the command", async () => {
     await expect(tryRouteCli(["node", "openclaw", "--log-level", "debug", "status"])).resolves.toBe(
       true,

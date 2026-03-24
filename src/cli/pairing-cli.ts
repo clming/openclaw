@@ -15,7 +15,7 @@ import { theme } from "../terminal/theme.js";
 import { formatCliCommand } from "./command-format.js";
 
 /** Parse channel, allowing extension channels not in core registry. */
-function parseChannel(raw: unknown, channels: PairingChannel[]): PairingChannel {
+export function parseChannel(raw: unknown, channels: PairingChannel[]): PairingChannel {
   const value = (
     typeof raw === "string"
       ? raw

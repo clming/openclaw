@@ -24,7 +24,9 @@ async function prepareRoutedCommand(params: {
     const { ensurePluginRegistryLoaded } = await import("./plugin-registry.js");
     ensurePluginRegistryLoaded({
       scope:
-        params.commandPath[0] === "status" || params.commandPath[0] === "health"
+        params.commandPath[0] === "status" ||
+        params.commandPath[0] === "health" ||
+        params.commandPath[0] === "pairing"
           ? "channels"
           : "all",
     });
