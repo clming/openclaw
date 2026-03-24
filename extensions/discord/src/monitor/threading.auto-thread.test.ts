@@ -2,6 +2,27 @@ import { ChannelType } from "@buape/carbon";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { maybeCreateDiscordAutoThread } from "./threading.js";
 
+// Ensure ChannelType is defined for the mock environment
+vi.mock("@buape/carbon", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@buape/carbon")>();
+  return {
+    ...actual,
+    ChannelType: {
+      ...actual?.ChannelType,
+      GuildText: 0,
+      GuildForum: 15,
+      GuildMedia: 16,
+      GuildVoice: 2,
+      GuildStageVoice: 13,
+      PublicThread: 11,
+      PrivateThread: 12,
+      AnnouncementThread: 10,
+      DM: 1,
+      GroupDM: 3,
+    },
+  };
+});
+
 const postMock = vi.fn();
 const getMock = vi.fn();
 const mockClient = {
@@ -18,7 +39,7 @@ async function runAutoThread(
   return maybeCreateDiscordAutoThread({
     client: mockClient,
     message: mockMessage,
-    messageChannelId: "text1",
+    messageChannelId: "parent-1",
     isGuildMessage: true,
     channelConfig: { allowed: true, autoThread: true },
     channelType: ChannelType.GuildText,
@@ -80,9 +101,9 @@ describe("maybeCreateDiscordAutoThread", () => {
   });
 
   it("creates auto-thread if channelType is GuildText", async () => {
-    postMock.mockResolvedValueOnce({ id: "thread1" });
+    postMock.mockResolvedValueOnce({ id: "thread-1" });
     const result = await runAutoThread();
-    expect(result).toBe("thread1");
+    expect(result).toBe("thread-1");
     expect(postMock).toHaveBeenCalled();
   });
 });
@@ -94,7 +115,7 @@ describe("maybeCreateDiscordAutoThread autoArchiveDuration", () => {
   });
 
   it("uses configured autoArchiveDuration", async () => {
-    postMock.mockResolvedValueOnce({ id: "thread1" });
+    postMock.mockResolvedValueOnce({ id: "thread-1" });
     await runAutoThread({
       channelConfig: { allowed: true, autoThread: true, autoArchiveDuration: "10080" },
     });
@@ -102,7 +123,7 @@ describe("maybeCreateDiscordAutoThread autoArchiveDuration", () => {
   });
 
   it("accepts numeric autoArchiveDuration", async () => {
-    postMock.mockResolvedValueOnce({ id: "thread1" });
+    postMock.mockResolvedValueOnce({ id: "thread-1" });
     await runAutoThread({
       channelConfig: { allowed: true, autoThread: true, autoArchiveDuration: 4320 },
     });
@@ -110,7 +131,7 @@ describe("maybeCreateDiscordAutoThread autoArchiveDuration", () => {
   });
 
   it("defaults to 60 when autoArchiveDuration not set", async () => {
-    postMock.mockResolvedValueOnce({ id: "thread1" });
+    postMock.mockResolvedValueOnce({ id: "thread-1" });
     await runAutoThread();
     expectAutoArchiveDuration(60);
   });
