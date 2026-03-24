@@ -54,6 +54,15 @@ type CreateMattermostConnectOnceOpts = {
   onPosted: (post: MattermostPost, payload: MattermostEventPayload) => Promise<void>;
   onReaction?: (payload: MattermostEventPayload) => Promise<void>;
   webSocketFactory?: MattermostWebSocketFactory;
+  /**
+   * Called periodically to check whether the bot account has been modified
+   * (e.g. disabled then re-enabled) since the WebSocket was opened.
+   * Returns the bot's current `update_at` timestamp.  When it differs from
+   * the value recorded at connect time, the connection is terminated so the
+   * reconnect loop can establish a fresh one.
+   */
+  getBotUpdateAt?: () => Promise<number>;
+  healthCheckIntervalMs?: number;
 };
 
 export const defaultMattermostWebSocketFactory: MattermostWebSocketFactory = (url) =>
@@ -102,6 +111,7 @@ export function createMattermostConnectOnce(
   opts: CreateMattermostConnectOnceOpts,
 ): () => Promise<void> {
   const webSocketFactory = opts.webSocketFactory ?? defaultMattermostWebSocketFactory;
+  const healthCheckIntervalMs = opts.healthCheckIntervalMs ?? 30_000;
   return async () => {
     const ws = webSocketFactory(opts.wsUrl);
     const onAbort = () => ws.terminate();
@@ -111,11 +121,22 @@ export function createMattermostConnectOnce(
       return await new Promise<void>((resolve, reject) => {
         let opened = false;
         let settled = false;
+        let healthCheckTimer: ReturnType<typeof setInterval> | undefined;
+        let initialUpdateAt: number | undefined;
+
+        const clearTimers = () => {
+          if (healthCheckTimer !== undefined) {
+            clearInterval(healthCheckTimer);
+            healthCheckTimer = undefined;
+          }
+        };
+
         const resolveOnce = () => {
           if (settled) {
             return;
           }
           settled = true;
+          clearTimers();
           resolve();
         };
         const rejectOnce = (error: Error) => {
@@ -123,6 +144,7 @@ export function createMattermostConnectOnce(
             return;
           }
           settled = true;
+          clearTimers();
           reject(error);
         };
 
@@ -140,6 +162,37 @@ export function createMattermostConnectOnce(
               data: { token: opts.botToken },
             }),
           );
+
+          // Periodically check if the bot account was modified (e.g. disable/enable).
+          // After such a cycle the WebSocket silently stops delivering events even
+          // though the connection itself stays alive.  Comparing update_at detects
+          // this reliably regardless of how quickly the cycle happens.
+          if (opts.getBotUpdateAt) {
+            const getBotUpdateAt = opts.getBotUpdateAt;
+            // Capture initial update_at, then start polling.
+            getBotUpdateAt()
+              .then((ts) => {
+                if (settled) return;
+                initialUpdateAt = ts;
+                healthCheckTimer = setInterval(() => {
+                  getBotUpdateAt()
+                    .then((current) => {
+                      if (initialUpdateAt !== undefined && current !== initialUpdateAt) {
+                        opts.runtime.log?.(
+                          `mattermost: bot account updated (update_at changed: ${initialUpdateAt} → ${current}) — reconnecting`,
+                        );
+                        ws.terminate();
+                      }
+                    })
+                    .catch((err) => {
+                      opts.runtime.error?.(`mattermost: health check error: ${String(err)}`);
+                    });
+                }, healthCheckIntervalMs);
+              })
+              .catch((err) => {
+                opts.runtime.error?.(`mattermost: failed to get initial update_at: ${String(err)}`);
+              });
+          }
         });
 
         ws.on("message", async (data) => {
@@ -178,6 +231,7 @@ export function createMattermostConnectOnce(
         });
 
         ws.on("close", (code, reason) => {
+          clearTimers();
           const message = reasonToString(reason);
           opts.statusSink?.({
             connected: false,
