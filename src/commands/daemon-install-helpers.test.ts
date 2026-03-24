@@ -236,6 +236,32 @@ describe("buildGatewayInstallPlan", () => {
 
     expect(plan.environment.OPENAI_API_KEY).toBe("openai-test-value");
   });
+
+  it("does not suppress shell value when durable .env has empty placeholder", async () => {
+    mockNodeGatewayPlanFixture({ serviceEnvironment: { OPENCLAW_PORT: "3000" } });
+    stateDirForTest = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-state-"));
+    process.env.OPENCLAW_STATE_DIR = stateDirForTest;
+    // Write an empty placeholder — should NOT block shell injection.
+    fs.writeFileSync(path.join(stateDirForTest, ".env"), "OPENAI_API_KEY=\n", "utf8");
+    mocks.loadAuthProfileStoreForSecretsRuntime.mockReturnValue({
+      version: 1,
+      profiles: {
+        "openai:default": {
+          type: "api_key",
+          provider: "openai",
+          keyRef: { source: "env", provider: "default", id: "OPENAI_API_KEY" },
+        },
+      },
+    });
+
+    const plan = await buildGatewayInstallPlan({
+      env: { OPENCLAW_STATE_DIR: stateDirForTest, OPENAI_API_KEY: "shell-value" },
+      port: 3000,
+      runtime: "node",
+    });
+
+    expect(plan.environment.OPENAI_API_KEY).toBe("shell-value");
+  });
 });
 
 describe("gatewayInstallErrorHint", () => {

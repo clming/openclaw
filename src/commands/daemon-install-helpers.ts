@@ -6,10 +6,10 @@ import {
   type AuthProfileStore,
 } from "../agents/auth-profiles.js";
 import { formatCliCommand } from "../cli/command-format.js";
-import { resolveStateDir } from "../config/paths.js";
 import { resolveGatewayLaunchAgentLabel } from "../daemon/constants.js";
 import { resolveGatewayProgramArguments } from "../daemon/program-args.js";
 import { buildServiceEnvironment } from "../daemon/service-env.js";
+import { resolveConfigDir } from "../utils.js";
 import {
   emitDaemonInstallRuntimeWarning,
   resolveDaemonInstallRuntimeInputs,
@@ -27,10 +27,14 @@ export type GatewayInstallPlan = {
 };
 
 function readDurableStateEnvKeys(env: Record<string, string | undefined>): Set<string> {
-  const envPath = path.join(resolveStateDir(env as NodeJS.ProcessEnv), ".env");
+  // Use resolveConfigDir (same path as loadDotEnv) so the skip list matches
+  // the .env the installed daemon will actually read at runtime.
+  const envPath = path.join(resolveConfigDir(env as NodeJS.ProcessEnv), ".env");
   try {
     const parsed = dotenv.parse(fs.readFileSync(envPath, "utf8"));
-    return new Set(Object.keys(parsed));
+    // Only skip keys that have a non-empty durable value; empty/placeholder
+    // entries like OPENAI_API_KEY= should not suppress a valid shell value.
+    return new Set(Object.keys(parsed).filter((k) => parsed[k].trim() !== ""));
   } catch {
     return new Set();
   }
