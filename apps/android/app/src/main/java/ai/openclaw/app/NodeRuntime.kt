@@ -195,7 +195,7 @@ class NodeRuntime(
 
   private fun generateNodeSessionKey(): String {
     val deviceId = identityStore.loadOrCreate().deviceId
-    val shortDeviceId = deviceId.take(8)
+    val shortDeviceId = deviceId.take(12)
     return "agent:main:node-$shortDeviceId"
   }
 
