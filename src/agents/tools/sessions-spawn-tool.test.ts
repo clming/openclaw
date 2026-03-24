@@ -185,6 +185,48 @@ describe("sessions_spawn tool", () => {
     );
   });
 
+  it("passes notifyChannel and notifyTarget to subagent spawn", async () => {
+    const tool = createSessionsSpawnTool({
+      agentSessionKey: "agent:main:main",
+      agentChannel: "discord",
+      agentAccountId: "default",
+      agentTo: "channel:123",
+    });
+
+    await tool.execute("call-notify", {
+      task: "background work",
+      notifyChannel: "telegram",
+      notifyTarget: "-1001234567890",
+    });
+
+    expect(hoisted.spawnSubagentDirectMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task: "background work",
+        notifyChannel: "telegram",
+        notifyTarget: "-1001234567890",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("rejects incomplete completion notification params for subagent runtime", async () => {
+    const tool = createSessionsSpawnTool({
+      agentSessionKey: "agent:main:main",
+    });
+
+    const result = await tool.execute("call-notify-invalid", {
+      task: "background work",
+      notifyChannel: "telegram",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "error",
+    });
+    const details = result.details as { error?: string };
+    expect(details.error).toContain("notifyChannel and notifyTarget must be provided together");
+    expect(hoisted.spawnSubagentDirectMock).not.toHaveBeenCalled();
+  });
+
   it("rejects resumeSessionId without runtime=acp", async () => {
     const tool = createSessionsSpawnTool({
       agentSessionKey: "agent:main:main",
@@ -220,6 +262,29 @@ describe("sessions_spawn tool", () => {
     });
     const details = result.details as { error?: string };
     expect(details.error).toContain("attachments are currently unsupported for runtime=acp");
+    expect(hoisted.spawnAcpDirectMock).not.toHaveBeenCalled();
+    expect(hoisted.spawnSubagentDirectMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects notifyChannel and notifyTarget for ACP runtime", async () => {
+    const tool = createSessionsSpawnTool({
+      agentSessionKey: "agent:main:main",
+    });
+
+    const result = await tool.execute("call-3a", {
+      runtime: "acp",
+      task: "analyze file",
+      notifyChannel: "telegram",
+      notifyTarget: "123",
+    });
+
+    expect(result.details).toMatchObject({
+      status: "error",
+    });
+    const details = result.details as { error?: string };
+    expect(details.error).toContain(
+      "notifyChannel/notifyTarget are currently unsupported for runtime=acp",
+    );
     expect(hoisted.spawnAcpDirectMock).not.toHaveBeenCalled();
     expect(hoisted.spawnSubagentDirectMock).not.toHaveBeenCalled();
   });

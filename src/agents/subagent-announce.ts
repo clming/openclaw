@@ -1316,6 +1316,7 @@ export async function runSubagentAnnounceFlow(params: {
   expectsCompletionMessage?: boolean;
   spawnMode?: SpawnSubagentMode;
   wakeOnDescendantSettle?: boolean;
+  onWakeContinuationStarted?: () => void;
   signal?: AbortSignal;
   bestEffortDeliver?: boolean;
 }): Promise<boolean> {
@@ -1427,6 +1428,7 @@ export async function runSubagentAnnounceFlow(params: {
         signal: params.signal,
       });
       if (woke) {
+        params.onWakeContinuationStarted?.();
         shouldDeleteChildSession = false;
         return true;
       }

@@ -62,6 +62,10 @@ export type SpawnSubagentParams = {
   cleanup?: "delete" | "keep";
   sandbox?: SpawnSubagentSandboxMode;
   expectsCompletionMessage?: boolean;
+  /** Channel plugin id to send an external completion notification to (e.g. 'discord', 'telegram'). */
+  notifyChannel?: string;
+  /** Target channel/chat id for the external completion notification. */
+  notifyTarget?: string;
   attachments?: Array<{
     name: string;
     content: string;
@@ -317,10 +321,19 @@ export async function spawnSubagentDirect(
     requestedMode: params.mode,
     threadRequested: requestThreadBinding,
   });
+  const notifyChannel = params.notifyChannel?.trim();
+  const notifyTarget = params.notifyTarget?.trim();
   if (spawnMode === "session" && !requestThreadBinding) {
     return {
       status: "error",
       error: 'mode="session" requires thread=true so the subagent can stay bound to a thread.',
+    };
+  }
+  if (Boolean(notifyChannel) !== Boolean(notifyTarget)) {
+    return {
+      status: "error",
+      error:
+        "notifyChannel and notifyTarget must be provided together for completion notifications",
     };
   }
   const cleanup =
@@ -756,6 +769,8 @@ export async function spawnSubagentDirect(
       attachmentsDir: attachmentAbsDir,
       attachmentsRootDir: attachmentRootDir,
       retainAttachmentsOnKeep: retainOnSessionKeep,
+      notifyChannel,
+      notifyTarget,
     });
   } catch (err) {
     if (attachmentAbsDir) {
