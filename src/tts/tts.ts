@@ -61,6 +61,9 @@ const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_multilingual_v2";
 const DEFAULT_EDGE_VOICE = "en-US-MichelleNeural";
 const DEFAULT_EDGE_LANG = "en-US";
 const DEFAULT_EDGE_OUTPUT_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
+const DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
+const DEFAULT_XAI_VOICE_ID = "eve";
+const DEFAULT_XAI_LANGUAGE = "en";
 
 const DEFAULT_ELEVENLABS_VOICE_SETTINGS = {
   stability: 0.5,
@@ -75,6 +78,8 @@ const TELEGRAM_OUTPUT = {
   // ElevenLabs output formats use codec_sample_rate_bitrate naming.
   // Opus @ 48kHz/64kbps is a good voice-note tradeoff for Telegram.
   elevenlabs: "opus_48000_64",
+  // xAI does not support Opus; fallback to MP3.
+  xai: "mp3_44100_128",
   extension: ".opus",
   voiceCompatible: true,
 };
@@ -82,6 +87,7 @@ const TELEGRAM_OUTPUT = {
 const DEFAULT_OUTPUT = {
   openai: "mp3" as const,
   elevenlabs: "mp3_44100_128",
+  xai: "mp3_44100_128",
   extension: ".mp3",
   voiceCompatible: false,
 };
@@ -132,6 +138,12 @@ export type ResolvedTtsConfig = {
     proxy?: string;
     timeoutMs?: number;
   };
+  xai: {
+    apiKey?: string;
+    baseUrl: string;
+    voiceId: string;
+    language?: string;
+  };
   prefsPath?: string;
   maxTextLength: number;
   timeoutMs: number;
@@ -178,6 +190,10 @@ export type TtsDirectiveOverrides = {
   microsoft?: {
     voice?: string;
     outputFormat?: string;
+  };
+  xai?: {
+    voiceId?: string;
+    language?: string;
   };
 };
 
@@ -339,6 +355,15 @@ export function resolveTtsConfig(cfg: OpenClawConfig): ResolvedTtsConfig {
       proxy: rawMicrosoft.proxy?.trim() || undefined,
       timeoutMs: rawMicrosoft.timeoutMs,
     },
+    xai: {
+      apiKey: normalizeResolvedSecretInputString({
+        value: raw.xai?.apiKey,
+        path: "messages.tts.xai.apiKey",
+      }),
+      baseUrl: raw.xai?.baseUrl?.trim() || DEFAULT_XAI_BASE_URL,
+      voiceId: raw.xai?.voiceId ?? DEFAULT_XAI_VOICE_ID,
+      language: raw.xai?.language?.trim() || DEFAULT_XAI_LANGUAGE,
+    },
     prefsPath: raw.prefsPath,
     maxTextLength: raw.maxTextLength ?? DEFAULT_MAX_TEXT_LENGTH,
     timeoutMs: raw.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -478,6 +503,9 @@ export function getTtsProvider(config: ResolvedTtsConfig, prefsPath: string): Tt
   if (resolveTtsApiKey(config, "elevenlabs")) {
     return "elevenlabs";
   }
+  if (resolveTtsApiKey(config, "xai")) {
+    return "xai";
+  }
   return "microsoft";
 }
 
@@ -546,10 +574,13 @@ export function resolveTtsApiKey(
   if (normalizedProvider === "openai") {
     return config.openai.apiKey || process.env.OPENAI_API_KEY;
   }
+  if (provider === "xai") {
+    return config.xai.apiKey || process.env.XAI_API_KEY;
+  }
   return undefined;
 }
 
-export const TTS_PROVIDERS = ["openai", "elevenlabs", "microsoft"] as const;
+export const TTS_PROVIDERS = ["openai", "elevenlabs", "xai", "microsoft"] as const;
 
 export function resolveTtsProviderOrder(primary: TtsProvider, cfg?: OpenClawConfig): TtsProvider[] {
   const normalizedPrimary = normalizeSpeechProviderId(primary) ?? primary;

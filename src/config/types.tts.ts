@@ -93,6 +93,13 @@ export type TtsConfig = {
     proxy?: string;
     timeoutMs?: number;
   };
+  /** xAI configuration. */
+  xai?: {
+    apiKey?: SecretInput;
+    baseUrl?: string;
+    voiceId?: string;
+    language?: string;
+  };
   /** Optional path for local TTS user preferences JSON. */
   prefsPath?: string;
   /** Hard cap for text sent to TTS (chars). */

@@ -446,6 +446,15 @@ export const TtsConfigSchema = z
       })
       .strict()
       .optional(),
+    xai: z
+      .object({
+        apiKey: SecretInputSchema.optional().register(sensitive),
+        baseUrl: z.string().optional(),
+        voiceId: z.string().optional(),
+        language: z.string().optional(),
+      })
+      .strict()
+      .optional(),
     edge: TtsMicrosoftConfigSchema,
     microsoft: TtsMicrosoftConfigSchema,
     prefsPath: z.string().optional(),

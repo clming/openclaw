@@ -189,6 +189,17 @@ export function parseTtsDirectives(
               warnings.push(`invalid ElevenLabs voiceId "${rawValue}"`);
             }
             break;
+          case "xai_voiceid":
+          case "xai_voice":
+            if (!policy.allowVoice) {
+              break;
+            }
+            if (isValidVoiceId(rawValue)) {
+              overrides.xai = { ...overrides.xai, voiceId: rawValue };
+            } else {
+              warnings.push(`invalid xAI voiceId "${rawValue}"`);
+            }
+            break;
           case "model":
           case "modelid":
           case "model_id":
@@ -314,6 +325,11 @@ export function parseTtsDirectives(
             overrides.elevenlabs = {
               ...overrides.elevenlabs,
               languageCode: normalizeLanguageCode(rawValue),
+            };
+            // Also allow for xAI
+            overrides.xai = {
+              ...overrides.xai,
+              language: rawValue,
             };
             break;
           case "seed":

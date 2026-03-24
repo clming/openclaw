@@ -9,7 +9,7 @@ title: "Text-to-Speech (legacy path)"
 
 # Text-to-speech (TTS)
 
-OpenClaw can convert outbound replies into audio using ElevenLabs, Microsoft, or OpenAI.
+OpenClaw can convert outbound replies into audio using ElevenLabs, Microsoft, xAI or OpenAI.
 It works anywhere OpenClaw can send audio; Telegram gets a round voice-note bubble.
 
 ## Supported services
@@ -17,6 +17,8 @@ It works anywhere OpenClaw can send audio; Telegram gets a round voice-note bubb
 - **ElevenLabs** (primary or fallback provider)
 - **Microsoft** (primary or fallback provider; current bundled implementation uses `node-edge-tts`, default when no API keys)
 - **OpenAI** (primary or fallback provider; also used for summaries)
+- **xAI** (primary or fallback provider)
+- **Edge TTS** (primary or fallback provider; uses `node-edge-tts`, default when no API keys)
 
 ### Microsoft speech notes
 
@@ -31,12 +33,20 @@ Because this path is a public web service without a published SLA or quota,
 treat it as best-effort. If you need guaranteed limits and support, use OpenAI
 or ElevenLabs.
 
+### xAI TTS notes
+
+xAI TTS uses xAI's hosted neural TTS service. It's a hosted service with published API limits,
+requiring an `XAI_API_KEY` for authentication. xAI provides a selection of voices and supports
+various output formats, but does not support Opus audio. For voice-note channels like Telegram,
+OpenClaw falls back to MP3.
+
 ## Optional keys
 
-If you want OpenAI or ElevenLabs:
+If you want OpenAI, ElevenLabs, or xAI:
 
 - `ELEVENLABS_API_KEY` (or `XI_API_KEY`)
 - `OPENAI_API_KEY`
+- `XAI_API_KEY`
 
 Microsoft speech does **not** require an API key. If no API keys are found,
 OpenClaw defaults to Microsoft (unless disabled via
@@ -52,6 +62,7 @@ so that provider must also be authenticated if you enable summaries.
 - [OpenAI Audio API reference](https://platform.openai.com/docs/api-reference/audio)
 - [ElevenLabs Text to Speech](https://elevenlabs.io/docs/api-reference/text-to-speech)
 - [ElevenLabs Authentication](https://elevenlabs.io/docs/api-reference/authentication)
+- [xAI Text-to-Speech API](https://docs.x.ai/developers/rest-api-reference/inference/text-to-speech)
 - [node-edge-tts](https://github.com/SchneeHertz/node-edge-tts)
 - [Microsoft Speech output formats](https://learn.microsoft.com/azure/ai-services/speech-service/rest-text-to-speech#audio-outputs)
 
@@ -61,7 +72,7 @@ No. Auto‑TTS is **off** by default. Enable it in config with
 `messages.tts.auto` or per session with `/tts always` (alias: `/tts on`).
 
 Microsoft speech **is** enabled by default once TTS is on, and is used automatically
-when no OpenAI or ElevenLabs API keys are available.
+when no OpenAI, xAI or ElevenLabs API keys are available.
 
 ## Config
 
@@ -114,6 +125,25 @@ Full schema is in [Gateway configuration](/gateway/configuration).
           useSpeakerBoost: true,
           speed: 1.0,
         },
+      },
+    },
+  },
+}
+```
+
+### xAI primary
+
+```json5
+{
+  messages: {
+    tts: {
+      auto: "always",
+      provider: "xai",
+      xai: {
+        apiKey: "xai_api_key",
+        baseUrl: "https://api.x.ai/v1",
+        voiceId: "eve",
+        language: "en",
       },
     },
   },
@@ -207,8 +237,8 @@ Then run:
   - `tagged` only sends audio when the reply includes `[[tts]]` tags.
 - `enabled`: legacy toggle (doctor migrates this to `auto`).
 - `mode`: `"final"` (default) or `"all"` (includes tool/block replies).
-- `provider`: speech provider id such as `"elevenlabs"`, `"microsoft"`, or `"openai"` (fallback is automatic).
-- If `provider` is **unset**, OpenClaw prefers `openai` (if key), then `elevenlabs` (if key),
+- `provider`: speech provider id such as `"elevenlabs"`, `xAI`, `"microsoft"`, or `"openai"` (fallback is automatic).
+- If `provider` is **unset**, OpenClaw prefers `openai` (if key), then `elevenlabs` (if key), then `xai` (if key),
   otherwise `microsoft`.
 - Legacy `provider: "edge"` still works and is normalized to `microsoft`.
 - `summaryModel`: optional cheap model for auto-summary; defaults to `agents.defaults.model.primary`.
@@ -218,11 +248,15 @@ Then run:
 - `maxTextLength`: hard cap for TTS input (chars). `/tts audio` fails if exceeded.
 - `timeoutMs`: request timeout (ms).
 - `prefsPath`: override the local prefs JSON path (provider/limit/summary).
-- `apiKey` values fall back to env vars (`ELEVENLABS_API_KEY`/`XI_API_KEY`, `OPENAI_API_KEY`).
+- `apiKey` values fall back to env vars (`ELEVENLABS_API_KEY`/`XI_API_KEY`, `OPENAI_API_KEY`, `XAI_API_KEY`).
 - `elevenlabs.baseUrl`: override ElevenLabs API base URL.
 - `openai.baseUrl`: override the OpenAI TTS endpoint.
   - Resolution order: `messages.tts.openai.baseUrl` -> `OPENAI_TTS_BASE_URL` -> `https://api.openai.com/v1`
   - Non-default values are treated as OpenAI-compatible TTS endpoints, so custom model and voice names are accepted.
+- `xai.apiKey`: xAI API key (falls back to `XAI_API_KEY`).
+- `xai.baseUrl`: override the xAI TTS endpoint (default `https://api.x.ai/v1`).
+- `xai.voiceId`: xAI voice ID (`eve`, `ara`, `rex`, `sal`, `leo`; default `eve`).
+- `xai.language`: BCP-47 language code (default `en`).
 - `elevenlabs.voiceSettings`:
   - `stability`, `similarityBoost`, `style`: `0..1`
   - `useSpeakerBoost`: `true|false`
@@ -264,12 +298,12 @@ Here you go.
 
 Available directive keys (when enabled):
 
-- `provider` (registered speech provider id, for example `openai`, `elevenlabs`, or `microsoft`; requires `allowProvider: true`)
+- `provider` (registered speech provider id, for example `openai`,`xAI`, `elevenlabs`, or `microsoft`; requires `allowProvider: true`)
 - `voice` (OpenAI voice) or `voiceId` (ElevenLabs)
 - `model` (OpenAI TTS model or ElevenLabs model id)
 - `stability`, `similarityBoost`, `style`, `speed`, `useSpeakerBoost`
 - `applyTextNormalization` (`auto|on|off`)
-- `languageCode` (ISO 639-1)
+- `languageCode` (ElevenLabs) or `language` (xAI)
 - `seed`
 
 Disable all model overrides:
@@ -321,7 +355,8 @@ These override `messages.tts.*` for that host.
 
 - **Telegram**: Opus voice note (`opus_48000_64` from ElevenLabs, `opus` from OpenAI).
   - 48kHz / 64kbps is a good voice-note tradeoff and required for the round bubble.
-- **Other channels**: MP3 (`mp3_44100_128` from ElevenLabs, `mp3` from OpenAI).
+  - xAI does not support Opus; falls back to MP3 (`mp3_44100_128`).
+- **Other channels**: MP3 (`mp3_44100_128` from ElevenLabs/xAI, `mp3` from OpenAI).
   - 44.1kHz / 128kbps is the default balance for speech clarity.
 - **Microsoft**: uses `microsoft.outputFormat` (default `audio-24khz-48kbitrate-mono-mp3`).
   - The bundled transport accepts an `outputFormat`, but not all formats are available from the service.
@@ -330,7 +365,7 @@ These override `messages.tts.*` for that host.
     guaranteed Opus voice notes. citeturn1search1
   - If the configured Microsoft output format fails, OpenClaw retries with MP3.
 
-OpenAI/ElevenLabs formats are fixed; Telegram expects Opus for voice-note UX.
+OpenAI/ElevenLabs/xAI formats are fixed; Telegram expects Opus for voice-note UX (xAI uses MP3 fallback).
 
 ## Auto-TTS behavior
 
