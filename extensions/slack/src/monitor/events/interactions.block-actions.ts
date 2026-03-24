@@ -12,6 +12,11 @@ import {
 } from "openclaw/plugin-sdk/gateway-runtime";
 import { enqueueSystemEvent } from "openclaw/plugin-sdk/infra-runtime";
 import { dispatchPluginInteractiveHandler } from "openclaw/plugin-sdk/plugin-runtime";
+import { callGateway } from "../../../../../src/gateway/call.js";
+import {
+  GATEWAY_CLIENT_MODES,
+  GATEWAY_CLIENT_NAMES,
+} from "../../../../../src/utils/message-channel.js";
 import { SLACK_REPLY_BUTTON_ACTION_ID, SLACK_REPLY_SELECT_ACTION_ID } from "../../blocks-render.js";
 import { SLACK_EXEC_APPROVAL_ACTION_PREFIX } from "../../exec-approvals-handler.js";
 import {

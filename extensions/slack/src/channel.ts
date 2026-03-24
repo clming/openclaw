@@ -32,6 +32,7 @@ import {
 } from "openclaw/plugin-sdk/status-helpers";
 import {
   listEnabledSlackAccounts,
+  listSlackAccountIds,
   resolveSlackAccount,
   resolveSlackReplyToMode,
   type ResolvedSlackAccount,
@@ -65,6 +66,11 @@ import {
   type ChannelPlugin,
   type OpenClawConfig,
 } from "./runtime-api.js";
+import {
+  isSlackExecApprovalClientEnabled,
+  resolveSlackExecApprovalTarget,
+  shouldSuppressLocalSlackExecApprovalPrompt,
+} from "./exec-approvals.js";
 import { getSlackRuntime } from "./runtime.js";
 import { fetchSlackScopes } from "./scopes.js";
 import { slackSetupAdapter } from "./setup-core.js";
@@ -685,4 +691,57 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount, SlackProbe> = crea
       },
     },
   },
+<<<<<<< HEAD
 });
+=======
+  execApprovals: {
+    getInitiatingSurfaceState: ({ cfg, accountId }) =>
+      isSlackExecApprovalClientEnabled({ cfg, accountId })
+        ? { kind: "enabled" }
+        : { kind: "disabled" },
+    shouldSuppressLocalPrompt: ({ cfg, accountId, payload }) =>
+      shouldSuppressLocalSlackExecApprovalPrompt({ cfg, accountId, payload }),
+    hasConfiguredDmRoute: ({ cfg }) => {
+      return listEnabledSlackAccounts(cfg).some(({ accountId }) => {
+        if (!isSlackExecApprovalClientEnabled({ cfg, accountId })) {
+          return false;
+        }
+        const target = resolveSlackExecApprovalTarget({ cfg, accountId });
+        return target === "dm" || target === "both";
+      });
+    },
+    shouldSuppressForwardingFallback: ({ cfg, target, request }) => {
+      const channel = target.channel?.trim().toLowerCase();
+      if (channel !== "slack") {
+        return false;
+      }
+      const requestChannel = request.request.turnSourceChannel?.trim().toLowerCase() ?? "";
+      if (requestChannel !== "slack") {
+        return false;
+      }
+      const accountId = target.accountId?.trim() || request.request.turnSourceAccountId?.trim();
+      return isSlackExecApprovalClientEnabled({ cfg, accountId });
+    },
+  },
+  gateway: {
+    startAccount: async (ctx) => {
+      const account = ctx.account;
+      const botToken = account.botToken?.trim();
+      const appToken = account.appToken?.trim();
+      ctx.log?.info(`[${account.accountId}] starting provider`);
+      return getSlackRuntime().channel.slack.monitorSlackProvider({
+        botToken: botToken ?? "",
+        appToken: appToken ?? "",
+        accountId: account.accountId,
+        config: ctx.cfg,
+        runtime: ctx.runtime,
+        abortSignal: ctx.abortSignal,
+        mediaMaxMb: account.config.mediaMaxMb,
+        slashCommand: account.config.slashCommand,
+        setStatus: ctx.setStatus as (next: Record<string, unknown>) => void,
+        getStatus: ctx.getStatus as () => Record<string, unknown>,
+      });
+    },
+  },
+};
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad

@@ -1,4 +1,5 @@
 import type { WebClient } from "@slack/web-api";
+<<<<<<< HEAD
 import { GatewayClient } from "openclaw/plugin-sdk/gateway-runtime";
 import { createOperatorApprovalsGatewayClient } from "openclaw/plugin-sdk/gateway-runtime";
 import type { EventFrame } from "openclaw/plugin-sdk/gateway-runtime";
@@ -14,12 +15,35 @@ import { normalizeAccountId, parseAgentSessionKey } from "openclaw/plugin-sdk/ro
 import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
 import { compileSafeRegex, testRegexWithBoundedInput } from "openclaw/plugin-sdk/security-runtime";
+=======
+import type { OpenClawConfig } from "../../../src/config/config.js";
+import { GatewayClient } from "../../../src/gateway/client.js";
+import { createOperatorApprovalsGatewayClient } from "../../../src/gateway/operator-approvals-client.js";
+import type { EventFrame } from "../../../src/gateway/protocol/index.js";
+import { resolveExecApprovalCommandDisplay } from "../../../src/infra/exec-approval-command-display.js";
+import {
+  buildExecApprovalPendingReplyPayload,
+  type ExecApprovalPendingReplyParams,
+} from "../../../src/infra/exec-approval-reply.js";
+import { resolveExecApprovalSessionTarget } from "../../../src/infra/exec-approval-session-target.js";
+import type {
+  ExecApprovalRequest,
+  ExecApprovalResolved,
+} from "../../../src/infra/exec-approvals.js";
+import { createSubsystemLogger } from "../../../src/logging/subsystem.js";
+import { normalizeAccountId, parseAgentSessionKey } from "../../../src/routing/session-key.js";
+import type { RuntimeEnv } from "../../../src/runtime.js";
+import { compileSafeRegex, testRegexWithBoundedInput } from "../../../src/security/safe-regex.js";
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad
 import {
   getSlackExecApprovalApprovers,
   resolveSlackExecApprovalConfig,
   resolveSlackExecApprovalTarget,
 } from "./exec-approvals.js";
+<<<<<<< HEAD
 import type { OpenClawConfig } from "./runtime-api.js";
+=======
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad
 import { parseSlackTarget } from "./targets.js";
 import { truncateSlackText } from "./truncate.js";
 
@@ -315,6 +339,7 @@ export class SlackExecApprovalHandler {
     if (targetMode === "channel" || targetMode === "both") {
       if (sourceTarget) {
         targets.push(sourceTarget);
+<<<<<<< HEAD
         // When the source is a DM (kind === "user") and target mode is
         // "channel", also fall back to approver DMs. A DM-origin source
         // target only reaches the requester, who may not be an approver and
@@ -322,6 +347,8 @@ export class SlackExecApprovalHandler {
         if (sourceTarget.kind === "user" && targetMode === "channel") {
           fallbackToDm = true;
         }
+=======
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad
       } else {
         fallbackToDm = true;
       }
@@ -361,10 +388,14 @@ export class SlackExecApprovalHandler {
     // during the send window is not dropped.
     const timeoutMs = Math.max(0, request.expiresAtMs - this.nowMs());
     const timeoutId = setTimeout(() => {
+<<<<<<< HEAD
       // Use a distinct expired path instead of synthetic deny so that a real
       // resolve event arriving just after expiry can still update messages
       // with the correct outcome instead of permanently showing "Denied".
       void this.handleExpired(request.id);
+=======
+      void this.handleResolved({ id: request.id, decision: "deny", ts: Date.now() });
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad
     }, timeoutMs);
     timeoutId.unref?.();
     const pendingEntry: PendingApproval = { timeoutId, messages: [] };
@@ -465,6 +496,7 @@ export class SlackExecApprovalHandler {
     );
   }
 
+<<<<<<< HEAD
   /**
    * Mark a pending approval as expired without claiming a decision. The
    * pending entry is removed so we stop tracking it, and Slack messages are
@@ -501,6 +533,8 @@ export class SlackExecApprovalHandler {
     );
   }
 
+=======
+>>>>>>> 9bfe02feb3d53ed4cceed565486dc77595d1b9ad
   private handleGatewayEvent(evt: EventFrame): void {
     if (evt.event === "exec.approval.requested") {
       void this.handleRequested(evt.payload as ExecApprovalRequest);
