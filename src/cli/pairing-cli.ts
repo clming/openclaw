@@ -1,7 +1,8 @@
 import type { Command } from "commander";
+import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { normalizeChannelId } from "../channels/plugins/index.js";
 import { listPairingChannels, notifyPairingApproved } from "../channels/plugins/pairing.js";
-import { loadConfig } from "../config/config.js";
+import { loadConfig, readConfigFileSnapshot } from "../config/config.js";
 import { resolvePairingIdLabel } from "../pairing/pairing-labels.js";
 import {
   approveChannelPairingCode,
@@ -16,8 +17,14 @@ import { theme } from "../terminal/theme.js";
 import { formatCliCommand } from "./command-format.js";
 
 /** Ensure the plugin registry is populated so listPairingChannels() sees extension channels. */
-function ensurePluginsLoaded(): void {
-  loadOpenClawPlugins({ config: loadConfig() });
+async function ensurePluginsLoaded(): Promise<void> {
+  const snapshot = await readConfigFileSnapshot();
+  if (!snapshot.valid) {
+    return;
+  }
+  const config = loadConfig();
+  const workspaceDir = resolveAgentWorkspaceDir(config, resolveDefaultAgentId(config));
+  loadOpenClawPlugins({ config, workspaceDir });
 }
 
 /** Parse channel, allowing extension channels not in core registry. */
@@ -68,14 +75,14 @@ export function registerPairingCli(program: Command) {
   pairing
     .command("list")
     .description("List pending pairing requests")
-    .option("--channel <channel>", "Channel name")
+    .option("--channel <channel>", "Channel name (e.g., telegram, discord)")
     .option("--account <accountId>", "Account id (for multi-account channels)")
-    .argument("[channel]", "Channel name")
+    .argument("[channel]", "Channel name (e.g., telegram, discord)")
     .option("--json", "Print JSON", false)
     .action(async (channelArg, opts) => {
       // Populate plugin registry at action time (avoids loading all plugins
       // at CLI registration time, which slows down startup).
-      ensurePluginsLoaded();
+      await ensurePluginsLoaded();
       const channels = listPairingChannels();
       const channelRaw = opts.channel ?? channelArg ?? (channels.length === 1 ? channels[0] : "");
       if (!channelRaw) {
@@ -123,13 +130,13 @@ export function registerPairingCli(program: Command) {
   pairing
     .command("approve")
     .description("Approve a pairing code and allow that sender")
-    .option("--channel <channel>", "Channel name")
+    .option("--channel <channel>", "Channel name (e.g., telegram, discord)")
     .option("--account <accountId>", "Account id (for multi-account channels)")
     .argument("<codeOrChannel>", "Pairing code (or channel when using 2 args)")
     .argument("[code]", "Pairing code (when channel is passed as the 1st arg)")
     .option("--notify", "Notify the requester on the same channel", false)
     .action(async (codeOrChannel, code, opts) => {
-      ensurePluginsLoaded();
+      await ensurePluginsLoaded();
       const channels = listPairingChannels();
       const defaultChannel = channels.length === 1 ? channels[0] : "";
       const usingExplicitChannel = Boolean(opts.channel);

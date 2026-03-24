@@ -42,6 +42,12 @@ vi.mock("../channels/plugins/index.js", () => ({
 
 vi.mock("../config/config.js", () => ({
   loadConfig: vi.fn().mockReturnValue({}),
+  readConfigFileSnapshot: vi.fn().mockResolvedValue({ valid: true, config: {} }),
+}));
+
+vi.mock("../agents/agent-scope.js", () => ({
+  resolveAgentWorkspaceDir: vi.fn().mockReturnValue("/tmp/test-workspace"),
+  resolveDefaultAgentId: vi.fn().mockReturnValue("default"),
 }));
 
 vi.mock("../plugins/loader.js", () => ({
