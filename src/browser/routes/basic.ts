@@ -140,7 +140,7 @@ export function registerBrowserBasicRoutes(app: BrowserRouteRegistrar, ctx: Brow
         if (headlessParam) {
           // Headless mode only works with locally-launched profiles (openclaw driver).
           // Extension-based profiles (chrome) attach to an existing browser and cannot be made headless.
-          if (profileCtx.profile.driver === "extension") {
+          if (profileCtx.profile.driver === "existing-session") {
             return jsonError(
               res,
               400,
