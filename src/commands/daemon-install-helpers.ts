@@ -32,9 +32,15 @@ function readDurableStateEnvKeys(env: Record<string, string | undefined>): Set<s
   const envPath = path.join(resolveConfigDir(env as NodeJS.ProcessEnv), ".env");
   try {
     const parsed = dotenv.parse(fs.readFileSync(envPath, "utf8"));
-    // Only skip keys that have a non-empty durable value; empty/placeholder
-    // entries like OPENAI_API_KEY= should not suppress a valid shell value.
-    return new Set(Object.keys(parsed).filter((k) => parsed[k].trim() !== ""));
+    // Only skip keys that have a usable durable value — exclude empty values
+    // and unresolved shell-variable placeholders like ${OPENAI_API_KEY} or
+    // $OPENAI_API_KEY, which dotenv stores literally without expansion.
+    return new Set(
+      Object.keys(parsed).filter((k) => {
+        const v = parsed[k].trim();
+        return v !== "" && !/^\$\{[^}]+\}$/.test(v) && !/^\$[A-Za-z_][A-Za-z0-9_]*$/.test(v);
+      }),
+    );
   } catch {
     return new Set();
   }
