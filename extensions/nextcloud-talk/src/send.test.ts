@@ -19,6 +19,7 @@ const hoisted = vi.hoisted(() => ({
     random: "r",
     signature: "s",
   })),
+  mockFetchGuard: vi.fn(),
 }));
 
 vi.mock("./runtime.js", () => ({
@@ -33,6 +34,14 @@ vi.mock("./signature.js", () => ({
   generateNextcloudTalkSignature: hoisted.generateNextcloudTalkSignature,
 }));
 
+vi.mock("openclaw/plugin-sdk/infra-runtime", async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...original,
+    fetchWithSsrFGuard: hoisted.mockFetchGuard,
+  };
+});
+
 import { sendMessageNextcloudTalk, sendReactionNextcloudTalk } from "./send.js";
 
 describe("nextcloud-talk send cfg threading", () => {
@@ -42,6 +51,11 @@ describe("nextcloud-talk send cfg threading", () => {
     vi.clearAllMocks();
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
+    // Wire the SSRF guard mock to delegate to the global fetch mock
+    hoisted.mockFetchGuard.mockImplementation(async (p: { url: string; init?: RequestInit }) => {
+      const response = await globalThis.fetch(p.url, p.init);
+      return { response, release: async () => {}, finalUrl: p.url };
+    });
   });
 
   afterEach(() => {
