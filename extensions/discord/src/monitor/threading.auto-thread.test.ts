@@ -6,9 +6,9 @@ import { maybeCreateDiscordAutoThread } from "./threading.js";
 vi.mock("@buape/carbon", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@buape/carbon")>();
   return {
+    __esModule: true,
     ...actual,
-    ChannelType: {
-      ...actual?.ChannelType,
+    ChannelType: actual?.ChannelType ?? {
       GuildText: 0,
       GuildForum: 15,
       GuildMedia: 16,
