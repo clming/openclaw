@@ -131,3 +131,35 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
     });
   });
 });
+
+describe("resolveToolPathAgainstWorkspaceRoot – Windows drive letter paths (#54039)", () => {
+  it("treats a Windows backslash drive-letter path as absolute", async () => {
+    const { resolveToolPathAgainstWorkspaceRoot } = await loadModule();
+    const result = resolveToolPathAgainstWorkspaceRoot({
+      filePath: "C:\\Users\\Dan\\.openclaw\\workspace\\HEARTBEAT.md",
+      root: "/should/not/prepend",
+    });
+    // Must not prepend root to an absolute Windows path.
+    expect(result).not.toContain("/should/not/prepend");
+    expect(result).toMatch(/HEARTBEAT\.md$/);
+  });
+
+  it("treats a Windows forward-slash drive-letter path as absolute", async () => {
+    const { resolveToolPathAgainstWorkspaceRoot } = await loadModule();
+    const result = resolveToolPathAgainstWorkspaceRoot({
+      filePath: "D:/Projects/workspace/README.md",
+      root: "/should/not/prepend",
+    });
+    expect(result).not.toContain("/should/not/prepend");
+    expect(result).toMatch(/README\.md$/);
+  });
+
+  it("still resolves relative paths against root", async () => {
+    const { resolveToolPathAgainstWorkspaceRoot } = await loadModule();
+    const result = resolveToolPathAgainstWorkspaceRoot({
+      filePath: "memory/notes.md",
+      root: "/workspace",
+    });
+    expect(result).toBe(path.resolve("/workspace", "memory/notes.md"));
+  });
+});
