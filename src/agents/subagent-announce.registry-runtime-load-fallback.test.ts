@@ -44,11 +44,15 @@ async function importModuleWithRegistryRuntimeFailure() {
     resolveMainSessionKey: () => "agent:main:main",
   }));
 
-  vi.doMock("./pi-embedded.js", () => ({
-    isEmbeddedPiRunActive: () => false,
-    queueEmbeddedPiMessage: () => false,
-    waitForEmbeddedPiRunEnd: async () => true,
-  }));
+  vi.doMock("./pi-embedded.js", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./pi-embedded.js")>();
+    return {
+      ...actual,
+      isEmbeddedPiRunActive: () => false,
+      queueEmbeddedPiMessage: () => false,
+      waitForEmbeddedPiRunEnd: async () => true,
+    };
+  });
 
   vi.doMock("./subagent-depth.js", () => ({
     getSubagentDepthFromSessionStore: () => 0,

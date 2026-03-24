@@ -39,11 +39,15 @@ vi.mock("../config/sessions.js", () => ({
   resolveMainSessionKey: () => "agent:main:main",
 }));
 
-vi.mock("./pi-embedded.js", () => ({
-  isEmbeddedPiRunActive: () => false,
-  queueEmbeddedPiMessage: () => false,
-  waitForEmbeddedPiRunEnd: async () => true,
-}));
+vi.mock("./pi-embedded.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./pi-embedded.js")>();
+  return {
+    ...actual,
+    isEmbeddedPiRunActive: () => false,
+    queueEmbeddedPiMessage: () => false,
+    waitForEmbeddedPiRunEnd: async () => true,
+  };
+});
 
 import { runSubagentAnnounceFlow } from "./subagent-announce.js";
 import {
