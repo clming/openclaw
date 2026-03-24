@@ -1,6 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  hasOutboundReplyContent,
+  resolveSendableOutboundReplyParts,
+} from "openclaw/plugin-sdk/reply-payload";
+import {
   resolveAgentConfig,
   resolveAgentWorkspaceDir,
   resolveDefaultAgentId,
@@ -11,7 +15,6 @@ import { DEFAULT_HEARTBEAT_FILENAME } from "../agents/workspace.js";
 import { resolveHeartbeatReplyPayload } from "../auto-reply/heartbeat-reply-payload.js";
 import {
   DEFAULT_HEARTBEAT_ACK_MAX_CHARS,
-  DEFAULT_HEARTBEAT_EVERY,
   isHeartbeatContentEffectivelyEmpty,
   isTaskDue,
   parseHeartbeatTasks,
@@ -24,7 +27,6 @@ import { HEARTBEAT_TOKEN } from "../auto-reply/tokens.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { getChannelPlugin } from "../channels/plugins/index.js";
 import type { ChannelHeartbeatDeps } from "../channels/plugins/types.js";
-import { parseDurationMs } from "../cli/parse-duration.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
 import {
@@ -38,6 +40,7 @@ import {
   updateSessionStore,
 } from "../config/sessions.js";
 import type { AgentDefaultsConfig } from "../config/types.agent-defaults.js";
+import { resolveCronSession } from "../cron/isolated-agent/session.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { getQueueSize } from "../process/command-queue.js";
 import { CommandLane } from "../process/lanes.js";
@@ -58,6 +61,12 @@ import {
 } from "./heartbeat-events-filter.js";
 import { emitHeartbeatEvent, resolveIndicatorType } from "./heartbeat-events.js";
 import { resolveHeartbeatReasonKind } from "./heartbeat-reason.js";
+import {
+  isHeartbeatEnabledForAgent,
+  resolveHeartbeatIntervalMs,
+  resolveHeartbeatSummaryForAgent,
+  type HeartbeatSummary,
+} from "./heartbeat-summary.js";
 import { resolveHeartbeatVisibility } from "./heartbeat-visibility.js";
 import {
   areHeartbeatsEnabled,
@@ -86,6 +95,12 @@ export type HeartbeatDeps = OutboundSendDeps &
 const log = createSubsystemLogger("gateway/heartbeat");
 
 export { areHeartbeatsEnabled, setHeartbeatsEnabled };
+export {
+  isHeartbeatEnabledForAgent,
+  resolveHeartbeatIntervalMs,
+  resolveHeartbeatSummaryForAgent,
+  type HeartbeatSummary,
+} from "./heartbeat-summary.js";
 
 type HeartbeatConfig = AgentDefaultsConfig["heartbeat"];
 type HeartbeatAgent = {
@@ -93,17 +108,6 @@ type HeartbeatAgent = {
   heartbeat?: HeartbeatConfig;
 };
 
-export type HeartbeatSummary = {
-  enabled: boolean;
-  every: string;
-  everyMs: number | null;
-  prompt: string;
-  target: string;
-  model?: string;
-  ackMaxChars: number;
-};
-
-const DEFAULT_HEARTBEAT_TARGET = "none";
 export { isCronSystemEvent };
 
 type HeartbeatAgentState = {
@@ -124,18 +128,6 @@ function hasExplicitHeartbeatAgents(cfg: OpenClawConfig) {
   return list.some((entry) => Boolean(entry?.heartbeat));
 }
 
-export function isHeartbeatEnabledForAgent(cfg: OpenClawConfig, agentId?: string): boolean {
-  const resolvedAgentId = normalizeAgentId(agentId ?? resolveDefaultAgentId(cfg));
-  const list = cfg.agents?.list ?? [];
-  const hasExplicit = hasExplicitHeartbeatAgents(cfg);
-  if (hasExplicit) {
-    return list.some(
-      (entry) => Boolean(entry?.heartbeat) && normalizeAgentId(entry?.id) === resolvedAgentId,
-    );
-  }
-  return resolvedAgentId === resolveDefaultAgentId(cfg);
-}
-
 function resolveHeartbeatConfig(
   cfg: OpenClawConfig,
   agentId?: string,
@@ -151,54 +143,6 @@ function resolveHeartbeatConfig(
   return { ...defaults, ...overrides };
 }
 
-export function resolveHeartbeatSummaryForAgent(
-  cfg: OpenClawConfig,
-  agentId?: string,
-): HeartbeatSummary {
-  const defaults = cfg.agents?.defaults?.heartbeat;
-  const overrides = agentId ? resolveAgentConfig(cfg, agentId)?.heartbeat : undefined;
-  const enabled = isHeartbeatEnabledForAgent(cfg, agentId);
-
-  if (!enabled) {
-    return {
-      enabled: false,
-      every: "disabled",
-      everyMs: null,
-      prompt: resolveHeartbeatPromptText(defaults?.prompt),
-      target: defaults?.target ?? DEFAULT_HEARTBEAT_TARGET,
-      model: defaults?.model,
-      ackMaxChars: Math.max(0, defaults?.ackMaxChars ?? DEFAULT_HEARTBEAT_ACK_MAX_CHARS),
-    };
-  }
-
-  const merged = defaults || overrides ? { ...defaults, ...overrides } : undefined;
-  const every = merged?.every ?? defaults?.every ?? overrides?.every ?? DEFAULT_HEARTBEAT_EVERY;
-  const everyMs = resolveHeartbeatIntervalMs(cfg, undefined, merged);
-  const prompt = resolveHeartbeatPromptText(
-    merged?.prompt ?? defaults?.prompt ?? overrides?.prompt,
-  );
-  const target =
-    merged?.target ?? defaults?.target ?? overrides?.target ?? DEFAULT_HEARTBEAT_TARGET;
-  const model = merged?.model ?? defaults?.model ?? overrides?.model;
-  const ackMaxChars = Math.max(
-    0,
-    merged?.ackMaxChars ??
-      defaults?.ackMaxChars ??
-      overrides?.ackMaxChars ??
-      DEFAULT_HEARTBEAT_ACK_MAX_CHARS,
-  );
-
-  return {
-    enabled: true,
-    every,
-    everyMs,
-    prompt,
-    target,
-    model,
-    ackMaxChars,
-  };
-}
-
 function resolveHeartbeatAgents(cfg: OpenClawConfig): HeartbeatAgent[] {
   const list = cfg.agents?.list ?? [];
   if (hasExplicitHeartbeatAgents(cfg)) {
@@ -212,35 +156,6 @@ function resolveHeartbeatAgents(cfg: OpenClawConfig): HeartbeatAgent[] {
   }
   const fallbackId = resolveDefaultAgentId(cfg);
   return [{ agentId: fallbackId, heartbeat: resolveHeartbeatConfig(cfg, fallbackId) }];
-}
-
-export function resolveHeartbeatIntervalMs(
-  cfg: OpenClawConfig,
-  overrideEvery?: string,
-  heartbeat?: HeartbeatConfig,
-) {
-  const raw =
-    overrideEvery ??
-    heartbeat?.every ??
-    cfg.agents?.defaults?.heartbeat?.every ??
-    DEFAULT_HEARTBEAT_EVERY;
-  if (!raw) {
-    return null;
-  }
-  const trimmed = String(raw).trim();
-  if (!trimmed) {
-    return null;
-  }
-  let ms: number;
-  try {
-    ms = parseDurationMs(trimmed, { defaultUnit: "m" });
-  } catch {
-    return null;
-  }
-  if (ms <= 0) {
-    return null;
-  }
-  return ms;
 }
 
 export function resolveHeartbeatPrompt(cfg: OpenClawConfig, heartbeat?: HeartbeatConfig) {
@@ -460,7 +375,7 @@ function normalizeHeartbeatReply(
     mode: "heartbeat",
     maxAckChars: ackMaxChars,
   });
-  const hasMedia = Boolean(payload.mediaUrl || (payload.mediaUrls?.length ?? 0) > 0);
+  const hasMedia = resolveSendableOutboundReplyParts(payload).hasMedia;
   if (stripped.shouldSkip && !hasMedia) {
     return {
       shouldSkip: true,
@@ -702,6 +617,30 @@ export async function runHeartbeatOnce(opts: {
   }
   const { entry, sessionKey, storePath } = preflight.session;
   const previousUpdatedAt = entry?.updatedAt;
+
+  // When isolatedSession is enabled, create a fresh session via the same
+  // pattern as cron sessionTarget: "isolated". This gives the heartbeat
+  // a new session ID (empty transcript) each run, avoiding the cost of
+  // sending the full conversation history (~100K tokens) to the LLM.
+  // Delivery routing still uses the main session entry (lastChannel, lastTo).
+  const useIsolatedSession = heartbeat?.isolatedSession === true;
+  let runSessionKey = sessionKey;
+  let runStorePath = storePath;
+  if (useIsolatedSession) {
+    const isolatedKey = `${sessionKey}:heartbeat`;
+    const cronSession = resolveCronSession({
+      cfg,
+      sessionKey: isolatedKey,
+      agentId,
+      nowMs: startedAt,
+      forceNew: true,
+    });
+    cronSession.store[isolatedKey] = cronSession.sessionEntry;
+    await saveSessionStore(cronSession.storePath, cronSession.store);
+    runSessionKey = isolatedKey;
+    runStorePath = cronSession.storePath;
+  }
+
   const delivery = resolveHeartbeatDeliveryTarget({ cfg, entry, heartbeat });
   const heartbeatAccountId = heartbeat?.accountId?.trim();
   if (delivery.reason === "unknown-account") {
@@ -771,7 +710,7 @@ export async function runHeartbeatOnce(opts: {
     AccountId: delivery.accountId,
     MessageThreadId: delivery.threadId,
     Provider: hasExecCompletion ? "exec-event" : hasCronEvents ? "cron-event" : "heartbeat",
-    SessionKey: sessionKey,
+    SessionKey: runSessionKey,
   };
   if (!visibility.showAlerts && !visibility.showOk && !visibility.useIndicator) {
     emitHeartbeatEvent({
@@ -822,10 +761,11 @@ export async function runHeartbeatOnce(opts: {
   };
 
   try {
-    // Capture transcript state before the heartbeat run so we can prune if HEARTBEAT_OK
+    // Capture transcript state before the heartbeat run so we can prune if HEARTBEAT_OK.
+    // For isolated sessions, capture the isolated transcript (not the main session's).
     const transcriptState = await captureTranscriptState({
-      storePath,
-      sessionKey,
+      storePath: runStorePath,
+      sessionKey: runSessionKey,
       agentId,
     });
 
@@ -848,10 +788,7 @@ export async function runHeartbeatOnce(opts: {
       ? resolveHeartbeatReasoningPayloads(replyResult).filter((payload) => payload !== replyPayload)
       : [];
 
-    if (
-      !replyPayload ||
-      (!replyPayload.text && !replyPayload.mediaUrl && !replyPayload.mediaUrls?.length)
-    ) {
+    if (!replyPayload || !hasOutboundReplyContent(replyPayload)) {
       await restoreHeartbeatUpdatedAt({
         storePath,
         sessionKey,
@@ -908,8 +845,7 @@ export async function runHeartbeatOnce(opts: {
       return { status: "ran", durationMs: Date.now() - startedAt };
     }
 
-    const mediaUrls =
-      replyPayload.mediaUrls ?? (replyPayload.mediaUrl ? [replyPayload.mediaUrl] : []);
+    const mediaUrls = resolveSendableOutboundReplyParts(replyPayload).mediaUrls;
 
     // Suppress duplicate heartbeats (same payload) within a short window.
     // This prevents "nagging" when nothing changed but the model repeats the same items.
