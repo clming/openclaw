@@ -33,8 +33,8 @@ import {
 } from "../runtime-api.js";
 import type { ChannelMessageActionName } from "../runtime-api.js";
 import {
+  listEnabledFeishuAccountConfigs,
   resolveFeishuAccount,
-  resolveFeishuCredentials,
   listFeishuAccountIds,
   listEnabledFeishuAccounts,
   resolveDefaultFeishuAccountId,
@@ -98,10 +98,9 @@ function describeFeishuMessageTool({
 }: Parameters<
   NonNullable<ChannelMessageActionAdapter["describeMessageTool"]>
 >[0]): ChannelMessageToolDiscovery {
-  const enabled =
-    cfg.channels?.feishu?.enabled !== false &&
-    Boolean(resolveFeishuCredentials(cfg.channels?.feishu as FeishuConfig | undefined));
-  if (listEnabledFeishuAccounts(cfg).length === 0) {
+  const configuredAccounts = listEnabledFeishuAccountConfigs(cfg);
+  const enabled = cfg.channels?.feishu?.enabled !== false && configuredAccounts.length > 0;
+  if (configuredAccounts.length === 0) {
     return {
       actions: [],
       capabilities: enabled ? ["cards"] : [],
@@ -126,7 +125,9 @@ function describeFeishuMessageTool({
     "channel-info",
     "channel-list",
   ]);
-  if (areAnyFeishuReactionActionsEnabled(cfg)) {
+  if (
+    configuredAccounts.some((account) => isFeishuReactionsActionConfigured(cfg, account.config))
+  ) {
     actions.add("react");
     actions.add("reactions");
   }
@@ -198,13 +199,15 @@ function isFeishuReactionsActionEnabled(params: {
   return gate("reactions");
 }
 
-function areAnyFeishuReactionActionsEnabled(cfg: ClawdbotConfig): boolean {
-  for (const account of listEnabledFeishuAccounts(cfg)) {
-    if (isFeishuReactionsActionEnabled({ cfg, account })) {
-      return true;
-    }
-  }
-  return false;
+function isFeishuReactionsActionConfigured(cfg: ClawdbotConfig, accountConfig: FeishuConfig) {
+  const gate = createActionGate(
+    (accountConfig.actions ??
+      (cfg.channels?.feishu as { actions?: unknown } | undefined)?.actions) as Record<
+      string,
+      boolean | undefined
+    >,
+  );
+  return gate("reactions");
 }
 
 function isSupportedFeishuDirectConversationId(conversationId: string): boolean {

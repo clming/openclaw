@@ -6,10 +6,15 @@ import {
   resolveMergedAccountConfig,
 } from "openclaw/plugin-sdk/account-resolution";
 import type { ClawdbotConfig } from "../runtime-api.js";
-import { normalizeResolvedSecretInputString, normalizeSecretInputString } from "./secret-input.js";
+import {
+  hasConfiguredSecretInput,
+  normalizeResolvedSecretInputString,
+  normalizeSecretInputString,
+} from "./secret-input.js";
 import type {
   FeishuConfig,
   FeishuAccountConfig,
+  FeishuAccountSelectionSource,
   FeishuDefaultAccountSelectionSource,
   FeishuDomain,
   ResolvedFeishuAccount,
@@ -73,6 +78,51 @@ function mergeFeishuAccountConfig(cfg: ClawdbotConfig, accountId: string): Feish
     accountId,
     omitKeys: ["defaultAccount"],
   });
+}
+
+function resolveFeishuAccountConfigState(params: {
+  cfg: ClawdbotConfig;
+  accountId?: string | null;
+}): {
+  accountId: string;
+  selectionSource: FeishuAccountSelectionSource;
+  enabled: boolean;
+  configured: boolean;
+  name?: string;
+  domain: FeishuDomain;
+  config: FeishuConfig;
+} {
+  const hasExplicitAccountId =
+    typeof params.accountId === "string" && params.accountId.trim() !== "";
+  const defaultSelection = hasExplicitAccountId
+    ? null
+    : resolveDefaultFeishuAccountSelection(params.cfg);
+  const accountId = hasExplicitAccountId
+    ? normalizeAccountId(params.accountId)
+    : (defaultSelection?.accountId ?? DEFAULT_ACCOUNT_ID);
+  const selectionSource: FeishuAccountSelectionSource = hasExplicitAccountId
+    ? "explicit"
+    : (defaultSelection?.source ?? "fallback");
+  const feishuCfg = params.cfg.channels?.feishu as FeishuConfig | undefined;
+
+  const baseEnabled = feishuCfg?.enabled !== false;
+  const merged = mergeFeishuAccountConfig(params.cfg, accountId);
+  const accountEnabled = merged.enabled !== false;
+  const enabled = baseEnabled && accountEnabled;
+  const configured = Boolean(
+    hasConfiguredSecretInput(merged.appId) && hasConfiguredSecretInput(merged.appSecret),
+  );
+  const accountName = (merged as FeishuAccountConfig).name;
+
+  return {
+    accountId,
+    selectionSource,
+    enabled,
+    configured,
+    name: typeof accountName === "string" ? accountName.trim() || undefined : undefined,
+    domain: merged.domain ?? "feishu",
+    config: merged,
+  };
 }
 
 /**
@@ -168,46 +218,40 @@ export function resolveFeishuAccount(params: {
   cfg: ClawdbotConfig;
   accountId?: string | null;
 }): ResolvedFeishuAccount {
-  const hasExplicitAccountId =
-    typeof params.accountId === "string" && params.accountId.trim() !== "";
-  const defaultSelection = hasExplicitAccountId
-    ? null
-    : resolveDefaultFeishuAccountSelection(params.cfg);
-  const accountId = hasExplicitAccountId
-    ? normalizeAccountId(params.accountId)
-    : (defaultSelection?.accountId ?? DEFAULT_ACCOUNT_ID);
-  const selectionSource = hasExplicitAccountId
-    ? "explicit"
-    : (defaultSelection?.source ?? "fallback");
-  const feishuCfg = params.cfg.channels?.feishu as FeishuConfig | undefined;
-
-  // Base enabled state (top-level)
-  const baseEnabled = feishuCfg?.enabled !== false;
-
-  // Merge configs
-  const merged = mergeFeishuAccountConfig(params.cfg, accountId);
-
-  // Account-level enabled state
-  const accountEnabled = merged.enabled !== false;
-  const enabled = baseEnabled && accountEnabled;
-
-  // Resolve credentials from merged config
-  const creds = resolveFeishuCredentials(merged);
-  const accountName = (merged as FeishuAccountConfig).name;
+  const state = resolveFeishuAccountConfigState(params);
+  const creds = resolveFeishuCredentials(state.config);
 
   return {
-    accountId,
-    selectionSource,
-    enabled,
+    accountId: state.accountId,
+    selectionSource: state.selectionSource,
+    enabled: state.enabled,
     configured: Boolean(creds),
-    name: typeof accountName === "string" ? accountName.trim() || undefined : undefined,
+    name: state.name,
     appId: creds?.appId,
     appSecret: creds?.appSecret,
     encryptKey: creds?.encryptKey,
     verificationToken: creds?.verificationToken,
-    domain: creds?.domain ?? "feishu",
-    config: merged,
+    domain: creds?.domain ?? state.domain,
+    config: state.config,
   };
+}
+
+/**
+ * List all enabled accounts that appear configured from raw config input alone.
+ * This preflight path intentionally does not resolve SecretRefs.
+ */
+export function listEnabledFeishuAccountConfigs(cfg: ClawdbotConfig): Array<{
+  accountId: string;
+  selectionSource: FeishuAccountSelectionSource;
+  enabled: boolean;
+  configured: boolean;
+  name?: string;
+  domain: FeishuDomain;
+  config: FeishuConfig;
+}> {
+  return listFeishuAccountIds(cfg)
+    .map((accountId) => resolveFeishuAccountConfigState({ cfg, accountId }))
+    .filter((account) => account.enabled && account.configured);
 }
 
 /**

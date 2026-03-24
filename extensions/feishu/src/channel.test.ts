@@ -133,6 +133,23 @@ describe("feishuPlugin actions", () => {
     ]);
   });
 
+  it("does not resolve SecretRefs while describing message tools", () => {
+    const secretRefCfg = {
+      channels: {
+        feishu: {
+          enabled: true,
+          appId: { source: "file", provider: "default", id: "path/to/app-id" },
+          appSecret: { source: "file", provider: "default", id: "path/to/app-secret" },
+        },
+      },
+    } as OpenClawConfig;
+
+    expect(feishuPlugin.actions?.describeMessageTool?.({ cfg: secretRefCfg })).toMatchObject({
+      actions: expect.arrayContaining(["send", "read", "edit"]),
+      capabilities: ["cards"],
+    });
+  });
+
   it("does not advertise reactions when disabled via actions config", () => {
     const disabledCfg = {
       channels: {
