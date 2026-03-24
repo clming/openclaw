@@ -662,7 +662,12 @@ export class PostgresMemoryManager implements MemorySearchManager {
     log.info(`Memory sync complete: ${this.fileCount} files, ${this.chunkCount} chunks`);
   }
 
-  private async syncFile(fullPath: string, relPath: string, source: MemorySource, force?: boolean): Promise<void> {
+  private async syncFile(
+    fullPath: string,
+    relPath: string,
+    source: MemorySource,
+    force?: boolean,
+  ): Promise<void> {
     // Skip symlinks to match builtin backend behavior (security: prevents traversal outside workspace)
     const lstat = await fs.lstat(fullPath);
     if (lstat.isSymbolicLink()) {
