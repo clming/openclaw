@@ -106,6 +106,7 @@ describe("resolvePluginWebSearchProviders", () => {
             configUiHints: { unrelated: { label: "nope" } },
           },
         ],
+        diagnostics: [],
       } as ManifestRegistryModule["loadPluginManifestRegistry"] extends (...args: any[]) => infer R
         ? R
         : never);
