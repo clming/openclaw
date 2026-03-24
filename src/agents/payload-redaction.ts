@@ -61,7 +61,30 @@ function digestBase64Payload(data: string): string {
 }
 
 /**
- * Redacts image/base64 payload data from diagnostic objects before persistence.
+ * Credential field names to redact from diagnostic objects.
+ *
+ * Note: "token" is intentionally included to catch generic auth token fields,
+ * though it may also match non-sensitive tokens (pagination, CSRF). The security
+ * benefit of catching auth tokens outweighs the risk of over-redacting diagnostic
+ * fields. More specific fields (apiKey, bearerToken, accessToken, etc.) are listed
+ * separately for comprehensive coverage.
+ */
+const CREDENTIAL_FIELDS = [
+  "apiKey",
+  "token", // Generic auth token (intentionally broad for security coverage)
+  "password",
+  "secretKey",
+  "authorization",
+  "bearerToken",
+  "accessToken",
+  "refreshToken",
+  "clientSecret",
+  "apiSecret",
+  "secret",
+] as const;
+
+/**
+ * Redacts image/base64 payload data and credentials from diagnostic objects before persistence.
  */
 export function redactImageDataForDiagnostics(value: unknown): unknown {
   const seen = new WeakSet<object>();
@@ -89,6 +112,14 @@ export function redactImageDataForDiagnostics(value: unknown): unknown {
       out.bytes = estimateBase64DecodedBytes(record.data);
       out.sha256 = digestBase64Payload(record.data);
     }
+
+    // Redact credential fields to prevent plaintext logging of API keys
+    for (const field of CREDENTIAL_FIELDS) {
+      if (field in out) {
+        out[field] = "[REDACTED]";
+      }
+    }
+
     return out;
   };
 
