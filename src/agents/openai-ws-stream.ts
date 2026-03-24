@@ -31,8 +31,6 @@ import type {
   Context,
   Message,
   StopReason,
-  TextContent,
-  ToolCall,
 } from "@mariozechner/pi-ai";
 import {
   OpenAIWebSocketManager,
@@ -336,15 +334,20 @@ function parseReasoningItem(value: unknown): Extract<InputItem, { type: "reasoni
   }
   const record = value as {
     type?: unknown;
+    id?: unknown;
     content?: unknown;
     encrypted_content?: unknown;
     summary?: unknown;
   };
-  if (record.type !== "reasoning") {
+  if (
+    typeof record.type !== "string" ||
+    (record.type !== "reasoning" && !record.type.startsWith("reasoning."))
+  ) {
     return null;
   }
   return {
     type: "reasoning",
+    ...(typeof record.id === "string" ? { id: record.id } : {}),
     ...(typeof record.content === "string" ? { content: record.content } : {}),
     ...(typeof record.encrypted_content === "string"
       ? { encrypted_content: record.encrypted_content }
@@ -362,6 +365,41 @@ function parseThinkingSignature(value: unknown): Extract<InputItem, { type: "rea
   } catch {
     return null;
   }
+}
+
+function extractReasoningSummaryText(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  return value
+    .map((item) => {
+      if (typeof item === "string") {
+        return item.trim();
+      }
+      if (!item || typeof item !== "object") {
+        return "";
+      }
+      const record = item as { text?: unknown };
+      return typeof record.text === "string" ? record.text.trim() : "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function extractResponseReasoningText(item: unknown): string {
+  if (!item || typeof item !== "object") {
+    return "";
+  }
+  const record = item as { summary?: unknown; content?: unknown };
+  const summaryText = extractReasoningSummaryText(record.summary);
+  if (summaryText) {
+    return summaryText;
+  }
+  return typeof record.content === "string" ? record.content.trim() : "";
 }
 
 /** Convert pi-ai tool array to OpenAI FunctionToolDefinition[]. */
@@ -535,7 +573,7 @@ export function buildAssistantMessageFromResponse(
   response: ResponseObject,
   modelInfo: { api: string; provider: string; id: string },
 ): AssistantMessage {
-  const content: (TextContent | ToolCall)[] = [];
+  const content: AssistantMessage["content"] = [];
   let assistantPhase: OpenAIResponsesAssistantPhase | undefined;
 
   for (const item of response.output ?? []) {
@@ -573,8 +611,32 @@ export function buildAssistantMessageFromResponse(
           }
         })(),
       });
+    } else {
+      const itemType = (item as { type?: unknown }).type;
+      if (
+        typeof itemType !== "string" ||
+        (itemType !== "reasoning" && !itemType.startsWith("reasoning."))
+      ) {
+        continue;
+      }
+      const reasoning = extractResponseReasoningText(item);
+      if (!reasoning) {
+        continue;
+      }
+      const reasoningId = toNonEmptyString((item as { id?: unknown }).id);
+      content.push({
+        type: "thinking",
+        thinking: reasoning,
+        ...(reasoningId
+          ? {
+              thinkingSignature: JSON.stringify({
+                id: reasoningId,
+                type: itemType,
+              }),
+            }
+          : {}),
+      } as AssistantMessage["content"][number]);
     }
-    // "reasoning" items are informational only; skip.
   }
 
   const hasToolCalls = content.some((c) => c.type === "toolCall");
