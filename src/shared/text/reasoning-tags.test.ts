@@ -190,9 +190,11 @@ describe("stripReasoningTagsFromText", () => {
 
   describe("strict vs preserve mode", () => {
     it("applies strict and preserve modes to unclosed tags", () => {
+      // strict: answer captured before unclosed block → suppress ambiguous tail (safety boundary)
+      // preserve: always recover the tail
       const input = "Before <think>unclosed content after";
       const cases = [
-        { mode: "strict" as const, expected: "Before unclosed content after" },
+        { mode: "strict" as const, expected: "Before" },
         { mode: "preserve" as const, expected: "Before unclosed content after" },
       ];
       for (const { mode, expected } of cases) {
@@ -200,18 +202,21 @@ describe("stripReasoningTagsFromText", () => {
       }
     });
 
-    it("recovers answer text when trailing unclosed <think> has no content after it", () => {
+    it("recovers answer when trailing unclosed <think> has no content after it", () => {
+      // answer was already captured; trailing empty <think> contributes nothing
       const input = "<think>blah</think> answer text <think>";
       expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe("answer text");
     });
 
-    it("recovers content after unclosed second think block in strict mode", () => {
+    it("recovers answer when unclosed block contains the only answer text (data-loss path)", () => {
+      // nothing captured before second <think> — tail IS the answer
       const input = "<think>blah</think><think>answer text";
       expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe("answer text");
       expect(stripReasoningTagsFromText(input, { mode: "preserve" })).toBe("answer text");
     });
 
-    it("recovers content when entire reply is inside unclosed think block", () => {
+    it("recovers content when entire reply is inside an unclosed think block", () => {
+      // model forgot closing tag; entire reply is the answer, not reasoning
       const input = "<think>this is my complete answer without closing tag";
       expect(stripReasoningTagsFromText(input, { mode: "strict" })).toBe(
         "this is my complete answer without closing tag",
