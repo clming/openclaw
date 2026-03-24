@@ -253,7 +253,7 @@ describe("dedup on pattern+args combo", () => {
     expect(file.agents?.worker?.allowlist?.[1]?.args).toEqual(["other.py"]);
   });
 
-  it("allows path-only and exact-match entries for same binary", () => {
+  it("allows bare and arg-specific exact-match entries for same binary", () => {
     const dir = createHomeDir();
     vi.spyOn(Date, "now").mockReturnValue(100_000);
 
@@ -263,8 +263,11 @@ describe("dedup on pattern+args combo", () => {
 
     const file = readApprovalsFile(dir);
     expect(file.agents?.worker?.allowlist).toHaveLength(2);
-    expect(file.agents?.worker?.allowlist?.[0]?.matchMode).toBeUndefined();
+    // Both entries are exact-match; bare command gets args: []
+    expect(file.agents?.worker?.allowlist?.[0]?.matchMode).toBe("exact");
+    expect(file.agents?.worker?.allowlist?.[0]?.args).toEqual([]);
     expect(file.agents?.worker?.allowlist?.[1]?.matchMode).toBe("exact");
+    expect(file.agents?.worker?.allowlist?.[1]?.args).toEqual(["safe.py"]);
   });
 });
 
