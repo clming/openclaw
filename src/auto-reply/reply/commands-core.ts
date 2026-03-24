@@ -7,6 +7,37 @@ import { isAcpSessionKey, resolveAgentIdFromSessionKey } from "../../routing/ses
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
 import { resolveBoundAcpThreadSessionKey } from "./commands-acp/targets.js";
+import { handleAllowlistCommand } from "./commands-allowlist.js";
+import { handleApproveCommand } from "./commands-approve.js";
+import { handleBashCommand } from "./commands-bash.js";
+import { handleBtwCommand } from "./commands-btw.js";
+import { handleCompactCommand } from "./commands-compact.js";
+import { handleConfigCommand, handleDebugCommand } from "./commands-config.js";
+import {
+  handleCommandsListCommand,
+  handleContextCommand,
+  handleExportSessionCommand,
+  handleHelpCommand,
+  handleStatusCommand,
+  handleWhoamiCommand,
+} from "./commands-info.js";
+import { handleMcpCommand } from "./commands-mcp.js";
+import { handleModelsCommand } from "./commands-models.js";
+import { handlePluginCommand } from "./commands-plugin.js";
+import { handlePluginsCommand } from "./commands-plugins.js";
+import {
+  handleAbortTrigger,
+  handleActivationCommand,
+  handleFastCommand,
+  handleRestartCommand,
+  handleSessionCommand,
+  handleSendPolicyCommand,
+  handleStopCommand,
+  handleUsageCommand,
+} from "./commands-session.js";
+import { handleSubagentsCommand } from "./commands-subagents.js";
+import { handleTrustCommand, handleUntrustCommand } from "./commands-trust.js";
+import { handleTtsCommands } from "./commands-tts.js";
 import type {
   CommandHandler,
   CommandHandlerResult,

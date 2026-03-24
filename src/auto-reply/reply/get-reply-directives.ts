@@ -12,6 +12,7 @@ import type { MsgContext, TemplateContext } from "../templating.js";
 import type { ElevatedLevel, ReasoningLevel, ThinkLevel, VerboseLevel } from "../thinking.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { resolveBlockStreamingChunking } from "./block-streaming.js";
+import { resolveTrustedExecSecurity } from "./commands-trust.js";
 import { buildCommandContext } from "./commands-context.js";
 import { type InlineDirectives, parseInlineDirectives } from "./directive-handling.parse.js";
 import { applyInlineDirectiveOverrides } from "./get-reply-directives-apply.js";
@@ -83,11 +84,13 @@ export type ReplyDirectiveContinuation = {
 function resolveExecOverrides(params: {
   directives: InlineDirectives;
   sessionEntry?: SessionEntry;
+  sessionKey?: string;
 }): ExecOverrides | undefined {
   const host =
     params.directives.execHost ?? (params.sessionEntry?.execHost as ExecOverrides["host"]);
   const security =
     params.directives.execSecurity ??
+    resolveTrustedExecSecurity(params.sessionKey) ??
     (params.sessionEntry?.execSecurity as ExecOverrides["security"]);
   const ask = params.directives.execAsk ?? (params.sessionEntry?.execAsk as ExecOverrides["ask"]);
   const node = params.directives.execNode ?? params.sessionEntry?.execNode;
@@ -507,7 +510,7 @@ export async function resolveReplyDirectives(params: {
   model = applyResult.model;
   contextTokens = applyResult.contextTokens;
   const { directiveAck, perMessageQueueMode, perMessageQueueOptions } = applyResult;
-  const execOverrides = resolveExecOverrides({ directives, sessionEntry });
+  const execOverrides = resolveExecOverrides({ directives, sessionEntry, sessionKey });
 
   return {
     kind: "continue",
