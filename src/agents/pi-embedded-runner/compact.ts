@@ -66,6 +66,10 @@ import {
 } from "../pi-embedded-helpers.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
+import {
+  isToolAllowedByPolicyName,
+  resolveSubagentToolPolicyForSession,
+} from "../pi-tools.policy.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
 import { resolveSandboxContext } from "../sandbox.js";
 import { repairSessionFileIfNeeded } from "../session-file-repair.js";
@@ -837,11 +841,25 @@ export async function compactEmbeddedPiSessionDirect(
           ],
         })
       : undefined;
-    const effectiveTools = [
-      ...tools,
-      ...(bundleMcpRuntime?.tools ?? []),
-      ...(bundleLspRuntime?.tools ?? []),
-    ];
+    // Resolve subagent tool policy for MCP/LSP filtering (built-in tools are already filtered via pipeline)
+    const subagentToolPolicy =
+      params.sessionKey && isSubagentSessionKey(params.sessionKey)
+        ? resolveSubagentToolPolicyForSession(params.config, params.sessionKey)
+        : undefined;
+
+    // Filter MCP/LSP tools through subagent policy (same filtering applied to built-in tools)
+    const filteredMcpTools = subagentToolPolicy
+      ? (bundleMcpRuntime?.tools ?? []).filter((tool) =>
+          isToolAllowedByPolicyName(tool.name, subagentToolPolicy),
+        )
+      : (bundleMcpRuntime?.tools ?? []);
+    const filteredLspTools = subagentToolPolicy
+      ? (bundleLspRuntime?.tools ?? []).filter((tool) =>
+          isToolAllowedByPolicyName(tool.name, subagentToolPolicy),
+        )
+      : (bundleLspRuntime?.tools ?? []);
+
+    const effectiveTools = [...tools, ...filteredMcpTools, ...filteredLspTools];
     const allowedToolNames = collectAllowedToolNames({ tools: effectiveTools });
     logToolSchemasForGoogle({ tools: effectiveTools, provider });
     const machineName = await getMachineDisplayName();
