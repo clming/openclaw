@@ -1,27 +1,25 @@
 import type { WebClient } from "@slack/web-api";
-import type { OpenClawConfig } from "../../../src/config/config.js";
-import { GatewayClient } from "../../../src/gateway/client.js";
-import { createOperatorApprovalsGatewayClient } from "../../../src/gateway/operator-approvals-client.js";
-import type { EventFrame } from "../../../src/gateway/protocol/index.js";
-import { resolveExecApprovalCommandDisplay } from "../../../src/infra/exec-approval-command-display.js";
+import { GatewayClient } from "openclaw/plugin-sdk/gateway-runtime";
+import { createOperatorApprovalsGatewayClient } from "openclaw/plugin-sdk/gateway-runtime";
+import type { EventFrame } from "openclaw/plugin-sdk/gateway-runtime";
 import {
   buildExecApprovalPendingReplyPayload,
   type ExecApprovalPendingReplyParams,
-} from "../../../src/infra/exec-approval-reply.js";
-import { resolveExecApprovalSessionTarget } from "../../../src/infra/exec-approval-session-target.js";
-import type {
-  ExecApprovalRequest,
-  ExecApprovalResolved,
-} from "../../../src/infra/exec-approvals.js";
-import { createSubsystemLogger } from "../../../src/logging/subsystem.js";
-import { normalizeAccountId, parseAgentSessionKey } from "../../../src/routing/session-key.js";
-import type { RuntimeEnv } from "../../../src/runtime.js";
-import { compileSafeRegex, testRegexWithBoundedInput } from "../../../src/security/safe-regex.js";
+  resolveExecApprovalCommandDisplay,
+  resolveExecApprovalSessionTarget,
+  type ExecApprovalRequest,
+  type ExecApprovalResolved,
+} from "openclaw/plugin-sdk/infra-runtime";
+import { normalizeAccountId, parseAgentSessionKey } from "openclaw/plugin-sdk/routing";
+import { createSubsystemLogger } from "openclaw/plugin-sdk/runtime-env";
+import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime-env";
+import { compileSafeRegex, testRegexWithBoundedInput } from "openclaw/plugin-sdk/security-runtime";
 import {
   getSlackExecApprovalApprovers,
   resolveSlackExecApprovalConfig,
   resolveSlackExecApprovalTarget,
 } from "./exec-approvals.js";
+import type { OpenClawConfig } from "./runtime-api.js";
 import { parseSlackTarget } from "./targets.js";
 import { truncateSlackText } from "./truncate.js";
 
@@ -317,6 +315,13 @@ export class SlackExecApprovalHandler {
     if (targetMode === "channel" || targetMode === "both") {
       if (sourceTarget) {
         targets.push(sourceTarget);
+        // When the source is a DM (kind === "user") and target mode is
+        // "channel", also fall back to approver DMs. A DM-origin source
+        // target only reaches the requester, who may not be an approver and
+        // therefore cannot action the buttons.
+        if (sourceTarget.kind === "user" && targetMode === "channel") {
+          fallbackToDm = true;
+        }
       } else {
         fallbackToDm = true;
       }
@@ -356,7 +361,10 @@ export class SlackExecApprovalHandler {
     // during the send window is not dropped.
     const timeoutMs = Math.max(0, request.expiresAtMs - this.nowMs());
     const timeoutId = setTimeout(() => {
-      void this.handleResolved({ id: request.id, decision: "deny", ts: Date.now() });
+      // Use a distinct expired path instead of synthetic deny so that a real
+      // resolve event arriving just after expiry can still update messages
+      // with the correct outcome instead of permanently showing "Denied".
+      void this.handleExpired(request.id);
     }, timeoutMs);
     timeoutId.unref?.();
     const pendingEntry: PendingApproval = { timeoutId, messages: [] };
@@ -449,6 +457,42 @@ export class SlackExecApprovalHandler {
               text: {
                 type: "mrkdwn",
                 text: `:white_check_mark: Exec approval resolved: *${decisionLabel}*${byLabel}`,
+              },
+            },
+          ],
+        });
+      }),
+    );
+  }
+
+  /**
+   * Mark a pending approval as expired without claiming a decision. The
+   * pending entry is removed so we stop tracking it, and Slack messages are
+   * updated to show "Expired" instead of "Denied". If a real resolve event
+   * races with this, `handleResolved` will simply find no pending entry and
+   * return early -- the worst case is the message stays "Expired" which is
+   * accurate (the gateway timed out).
+   */
+  private async handleExpired(approvalId: string): Promise<void> {
+    const pending = this.pending.get(approvalId);
+    if (!pending) {
+      return;
+    }
+    clearTimeout(pending.timeoutId);
+    this.pending.delete(approvalId);
+
+    await Promise.allSettled(
+      pending.messages.map(async (message) => {
+        await this.opts.client.chat.update({
+          channel: message.channelId,
+          ts: message.ts,
+          text: "Exec approval expired.",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: ":hourglass: Exec approval *expired* (no response before timeout).",
               },
             },
           ],

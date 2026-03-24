@@ -534,6 +534,35 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount, SlackProbe> = crea
         };
       },
     }),
+    execApprovals: {
+      getInitiatingSurfaceState: ({ cfg, accountId }) =>
+        isSlackExecApprovalClientEnabled({ cfg, accountId })
+          ? { kind: "enabled" }
+          : { kind: "disabled" },
+      shouldSuppressLocalPrompt: ({ cfg, accountId, payload }) =>
+        shouldSuppressLocalSlackExecApprovalPrompt({ cfg, accountId, payload }),
+      hasConfiguredDmRoute: ({ cfg }) => {
+        return listEnabledSlackAccounts(cfg).some(({ accountId }) => {
+          if (!isSlackExecApprovalClientEnabled({ cfg, accountId })) {
+            return false;
+          }
+          const target = resolveSlackExecApprovalTarget({ cfg, accountId });
+          return target === "dm" || target === "both";
+        });
+      },
+      shouldSuppressForwardingFallback: ({ cfg, target, request }) => {
+        const channel = target.channel?.trim().toLowerCase();
+        if (channel !== "slack") {
+          return false;
+        }
+        const requestChannel = request.request.turnSourceChannel?.trim().toLowerCase() ?? "";
+        if (requestChannel !== "slack") {
+          return false;
+        }
+        const accountId = target.accountId?.trim() || request.request.turnSourceAccountId?.trim();
+        return isSlackExecApprovalClientEnabled({ cfg, accountId });
+      },
+    },
     gateway: {
       startAccount: async (ctx) => {
         const account = ctx.account;
@@ -652,122 +681,6 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount, SlackProbe> = crea
           threadTs: threadTsValue != null ? String(threadTsValue) : undefined,
           accountId: accountId ?? undefined,
           ...(tokenOverride ? { token: tokenOverride } : {}),
-        });
-      },
-    },
-  },
-  status: createComputedAccountStatusAdapter<ResolvedSlackAccount, SlackProbe>({
-      defaultRuntime: createDefaultChannelRuntimeState(DEFAULT_ACCOUNT_ID),
-      buildChannelSummary: ({ snapshot }) =>
-        buildPassiveProbedChannelStatusSummary(snapshot, {
-          botTokenSource: snapshot.botTokenSource ?? "none",
-          appTokenSource: snapshot.appTokenSource ?? "none",
-        }),
-      probeAccount: async ({ account, timeoutMs }) => {
-        const token = account.botToken?.trim();
-        if (!token) {
-          return { ok: false, error: "missing token" };
-        }
-        return await getSlackRuntime().channel.slack.probeSlack(token, timeoutMs);
-      },
-      formatCapabilitiesProbe: ({ probe }) => {
-        const slackProbe = probe as SlackProbe | undefined;
-        const lines = [];
-        if (slackProbe?.bot?.name) {
-          lines.push({ text: `Bot: @${slackProbe.bot.name}` });
-        }
-        if (slackProbe?.team?.name || slackProbe?.team?.id) {
-          const id = slackProbe.team?.id ? ` (${slackProbe.team.id})` : "";
-          lines.push({ text: `Team: ${slackProbe.team?.name ?? "unknown"}${id}` });
-        }
-        return lines;
-      },
-      buildCapabilitiesDiagnostics: async ({ account, timeoutMs }) => {
-        const lines = [];
-        const details: Record<string, unknown> = {};
-        const botToken = account.botToken?.trim();
-        const userToken = account.config.userToken?.trim();
-        const botScopes = botToken
-          ? await fetchSlackScopes(botToken, timeoutMs)
-          : { ok: false, error: "Slack bot token missing." };
-        lines.push(formatSlackScopeDiagnostic({ tokenType: "bot", result: botScopes }));
-        details.botScopes = botScopes;
-        if (userToken) {
-          const userScopes = await fetchSlackScopes(userToken, timeoutMs);
-          lines.push(formatSlackScopeDiagnostic({ tokenType: "user", result: userScopes }));
-          details.userScopes = userScopes;
-        }
-        return { lines, details };
-      },
-      resolveAccountSnapshot: ({ account }) => {
-        const mode = account.config.mode ?? "socket";
-        const configured =
-          (mode === "http"
-            ? resolveConfiguredFromRequiredCredentialStatuses(account, [
-                "botTokenStatus",
-                "signingSecretStatus",
-              ])
-            : resolveConfiguredFromRequiredCredentialStatuses(account, [
-                "botTokenStatus",
-                "appTokenStatus",
-              ])) ?? isSlackPluginAccountConfigured(account);
-        return {
-          accountId: account.accountId,
-          name: account.name,
-          enabled: account.enabled,
-          configured,
-          extra: {
-            ...projectCredentialSnapshotFields(account),
-          },
-        };
-      },
-    }),
-    execApprovals: {
-      getInitiatingSurfaceState: ({ cfg, accountId }) =>
-        isSlackExecApprovalClientEnabled({ cfg, accountId })
-          ? { kind: "enabled" }
-          : { kind: "disabled" },
-      shouldSuppressLocalPrompt: ({ cfg, accountId, payload }) =>
-        shouldSuppressLocalSlackExecApprovalPrompt({ cfg, accountId, payload }),
-      hasConfiguredDmRoute: ({ cfg }) => {
-        return listEnabledSlackAccounts(cfg).some(({ accountId }) => {
-          if (!isSlackExecApprovalClientEnabled({ cfg, accountId })) {
-            return false;
-          }
-          const target = resolveSlackExecApprovalTarget({ cfg, accountId });
-          return target === "dm" || target === "both";
-        });
-      },
-      shouldSuppressForwardingFallback: ({ cfg, target, request }) => {
-        const channel = target.channel?.trim().toLowerCase();
-        if (channel !== "slack") {
-          return false;
-        }
-        const requestChannel = request.request.turnSourceChannel?.trim().toLowerCase() ?? "";
-        if (requestChannel !== "slack") {
-          return false;
-        }
-        const accountId = target.accountId?.trim() || request.request.turnSourceAccountId?.trim();
-        return isSlackExecApprovalClientEnabled({ cfg, accountId });
-      },
-    },
-    gateway: {
-      startAccount: async (ctx) => {
-        const account = ctx.account;
-        const botToken = account.botToken?.trim();
-        const appToken = account.appToken?.trim();
-        ctx.log?.info(`[${account.accountId}] starting provider`);
-        return getSlackRuntime().channel.slack.monitorSlackProvider({
-          botToken: botToken ?? "",
-          appToken: appToken ?? "",
-          accountId: account.accountId,
-          config: ctx.cfg,
-          runtime: ctx.runtime,
-          abortSignal: ctx.abortSignal,
-          mediaMaxMb: account.config.mediaMaxMb,
-          slashCommand: account.config.slashCommand,
-          setStatus: ctx.setStatus as (next: Record<string, unknown>) => void,
-          getStatus: ctx.getStatus as () => Record<string, unknown>,
         });
       },
     },

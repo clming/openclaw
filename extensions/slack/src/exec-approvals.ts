@@ -1,8 +1,9 @@
-import type { ReplyPayload } from "../../../src/auto-reply/types.js";
-import type { OpenClawConfig } from "../../../src/config/config.js";
-import type { SlackExecApprovalConfig } from "../../../src/config/types.slack.js";
-import { getExecApprovalReplyMetadata } from "../../../src/infra/exec-approval-reply.js";
+import { getExecApprovalReplyMetadata } from "openclaw/plugin-sdk/infra-runtime";
+import type { ReplyPayload } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveSlackAccount } from "./accounts.js";
+import type { OpenClawConfig, SlackAccountConfig } from "./runtime-api.js";
+
+type SlackExecApprovalConfig = NonNullable<SlackAccountConfig["execApprovals"]>;
 
 export function resolveSlackExecApprovalConfig(params: {
   cfg: OpenClawConfig;
