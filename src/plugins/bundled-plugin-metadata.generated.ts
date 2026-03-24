@@ -3412,7 +3412,7 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
               },
               sttProvider: {
                 type: "string",
-                enum: ["openai-realtime"],
+                enum: ["openai-realtime", "elevenlabs-scribe"],
               },
               openaiApiKey: {
                 type: "string",
@@ -3447,6 +3447,12 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
               maxConnections: {
                 type: "integer",
                 minimum: 1,
+              },
+              elevenlabsApiKey: {
+                type: "string",
+              },
+              elevenlabsLanguageCode: {
+                type: "string",
               },
             },
           },
@@ -3660,6 +3666,9 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
           store: {
             type: "string",
           },
+          responseAgent: {
+            type: "string",
+          },
           responseModel: {
             type: "string",
           },
@@ -3669,6 +3678,23 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
           responseTimeoutMs: {
             type: "integer",
             minimum: 1,
+          },
+          silenceFiller: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              enabled: {
+                type: "boolean",
+              },
+              thresholdMs: {
+                type: "integer",
+                minimum: 1,
+              },
+              sfxSet: {
+                type: "string",
+                enum: ["typing", "processing"],
+              },
+            },
           },
         },
       },
@@ -3773,7 +3799,7 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
         },
         "tts.provider": {
           label: "TTS Provider Override",
-          help: "Deep-merges with messages.tts (Microsoft is ignored for calls).",
+          help: "Used for voice-call TTS only (does not read or merge messages.tts). Edge is ignored for calls.",
           advanced: true,
         },
         "tts.openai.model": {
@@ -3818,8 +3844,25 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
           label: "Call Log Store Path",
           advanced: true,
         },
+        responseAgent: {
+          label: "Response Agent",
+          help: "Agent ID for voice responses (default: main). Use a different agent for custom personality/skills.",
+          advanced: true,
+        },
         responseModel: {
           label: "Response Model",
+          advanced: true,
+        },
+        "silenceFiller.enabled": {
+          label: "Silence Filler",
+          advanced: true,
+        },
+        "silenceFiller.thresholdMs": {
+          label: "Silence Filler Threshold (ms)",
+          advanced: true,
+        },
+        "silenceFiller.sfxSet": {
+          label: "Silence Filler Sound Set",
           advanced: true,
         },
         responseSystemPrompt: {
