@@ -83,6 +83,7 @@ describe("discordOutbound shared interactive ordering", () => {
       channel: "discord",
       messageId: "msg-1",
       channelId: "123456",
+      meta: { transcriptText: "First\n[Approve]\nLast" },
     });
   });
 });

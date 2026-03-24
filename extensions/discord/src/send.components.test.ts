@@ -187,6 +187,35 @@ describe("sendDiscordComponentMessage", () => {
     expect(text).toBe("Heading\nBody line\nSection title\nDetail A\nDetail B\n[Go]\n[Choose one]");
   });
 
+  it("buildComponentTranscriptText summarizes select option labels when present", () => {
+    const text = buildComponentTranscriptText({
+      text: "Pick a color",
+      blocks: [
+        {
+          type: "actions",
+          select: {
+            placeholder: "Choose one",
+            options: [
+              { label: "Red", value: "red" },
+              { label: "Green", value: "green" },
+              { label: "Blue", value: "blue" },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(text).toBe("Pick a color\n[Red] [Green] [Blue]");
+  });
+
+  it("buildComponentTranscriptText falls back to placeholder for selects without options", () => {
+    const text = buildComponentTranscriptText({
+      blocks: [{ type: "actions", select: { type: "user", placeholder: "Pick a user" } }],
+    });
+
+    expect(text).toBe("[Pick a user]");
+  });
+
   it("buildComponentTranscriptText returns empty string for empty spec", () => {
     expect(buildComponentTranscriptText({})).toBe("");
     expect(buildComponentTranscriptText({ blocks: [{ type: "separator" }] })).toBe("");

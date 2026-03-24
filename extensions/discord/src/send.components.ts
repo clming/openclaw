@@ -67,7 +67,12 @@ export function buildComponentTranscriptText(spec: DiscordComponentMessageSpec):
           parts.push(block.buttons.map((b) => `[${b.label}]`).join(" "));
         }
         if (block.select) {
-          parts.push(`[${block.select.placeholder ?? "select"}]`);
+          const opts = block.select.options;
+          if (opts?.length) {
+            parts.push(opts.map((o) => `[${o.label}]`).join(" "));
+          } else {
+            parts.push(`[${block.select.placeholder ?? "select"}]`);
+          }
         }
         break;
     }
