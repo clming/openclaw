@@ -333,3 +333,7 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/fal/**"
+"extensions: lemonade":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/lemonade/**"

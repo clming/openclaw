@@ -36,6 +36,7 @@ Looking for chat channel docs (WhatsApp/Telegram/Discord/Slack/Mattermost (plugi
 - [Groq (LPU inference)](/providers/groq)
 - [Hugging Face (Inference)](/providers/huggingface)
 - [Kilocode](/providers/kilocode)
+- [Lemonade (local AI with GPU/NPU acceleration)](/providers/lemonade)
 - [LiteLLM (unified gateway)](/providers/litellm)
 - [MiniMax](/providers/minimax)
 - [Mistral](/providers/mistral)
