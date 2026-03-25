@@ -239,6 +239,30 @@ importers:
         specifier: 0.1.0
         version: 0.1.0
 
+  extensions/abb-robot-control:
+    dependencies:
+      ws:
+        specifier: ^8.17.1
+        version: 8.19.0
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.37
+      openclaw:
+        specifier: '*'
+        version: 2026.3.13(@discordjs/opus@0.10.0)(@napi-rs/canvas@0.1.95)(@types/express@5.0.6)(audio-decode@2.2.3)(node-llama-cpp@3.16.2(typescript@5.9.3))
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  extensions/abb-robot-real-control: {}
+
+  extensions/abb-robot-virtual-control:
+    dependencies:
+      ws:
+        specifier: ^8.17.1
+        version: 8.19.0
+
   extensions/acpx:
     dependencies:
       acpx:
