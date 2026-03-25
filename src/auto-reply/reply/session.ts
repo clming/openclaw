@@ -5,7 +5,7 @@ import {
   normalizeConversationText,
   parseTelegramChatIdFromTarget,
 } from "../../acp/conversation-id.js";
-import { resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { clearBootstrapSnapshotOnSessionRollover } from "../../agents/bootstrap-cache.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -30,6 +30,7 @@ import {
 } from "../../config/sessions/types.js";
 import type { TtsAutoMode } from "../../config/types.tts.js";
 import { archiveSessionTranscripts } from "../../gateway/session-archive.fs.js";
+import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import { resolveConversationIdFromTargets } from "../../infra/outbound/conversation-id.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
@@ -37,6 +38,7 @@ import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
 import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
+import { normalizeCommandBody } from "../commands-registry.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
 import { resolveEffectiveResetTargetSessionKey } from "./acp-reset-target.js";
 import { parseDiscordParentChannelFromSessionKey } from "./discord-parent-channel.js";
@@ -51,6 +53,9 @@ import { forkSessionFromParent, resolveParentForkMaxTokens } from "./session-for
 import { buildSessionEndHookPayload, buildSessionStartHookPayload } from "./session-hooks.js";
 
 const log = createSubsystemLogger("session-init");
+
+type AutomaticSessionResetAction = "daily_reset" | "idle_reset";
+const ACP_IN_PLACE_RESET_COMMANDS = ["/new", "/reset"] as const;
 
 export type SessionInitResult = {
   sessionCtx: TemplateContext;
@@ -166,6 +171,53 @@ function resolveBoundAcpSessionForReset(params: {
   });
 }
 
+function matchesCommandToken(commandBodyLower: string, commandLower: string): boolean {
+  if (commandBodyLower === commandLower) {
+    return true;
+  }
+  if (!commandBodyLower.startsWith(commandLower)) {
+    return false;
+  }
+  return /\s/u.test(commandBodyLower.charAt(commandLower.length));
+}
+
+function isAcpInPlaceResetCommand(commandBodyLower: string): boolean {
+  return ACP_IN_PLACE_RESET_COMMANDS.some((commandLower) =>
+    matchesCommandToken(commandBodyLower, commandLower),
+  );
+}
+
+function resolveAutomaticSessionResetAction(params: {
+  updatedAt: number;
+  now: number;
+  dailyResetAt?: number;
+  idleExpiresAt?: number;
+  resetTriggered: boolean;
+  suppressForResetCommand: boolean;
+}): AutomaticSessionResetAction | undefined {
+  if (params.resetTriggered || params.suppressForResetCommand) {
+    return undefined;
+  }
+  const staleDailyAt =
+    typeof params.dailyResetAt === "number" && params.updatedAt < params.dailyResetAt
+      ? params.dailyResetAt
+      : undefined;
+  const staleIdleAt =
+    typeof params.idleExpiresAt === "number" && params.now > params.idleExpiresAt
+      ? params.idleExpiresAt
+      : undefined;
+  if (typeof staleDailyAt === "number" && typeof staleIdleAt === "number") {
+    return staleDailyAt <= staleIdleAt ? "daily_reset" : "idle_reset";
+  }
+  if (typeof staleIdleAt === "number") {
+    return "idle_reset";
+  }
+  if (typeof staleDailyAt === "number") {
+    return "daily_reset";
+  }
+  return undefined;
+}
+
 export async function initSessionState(params: {
   ctx: MsgContext;
   cfg: OpenClawConfig;
@@ -218,6 +270,7 @@ export async function initSessionState(params: {
   let systemSent = false;
   let abortedLastRun = false;
   let resetTriggered = false;
+  let suppressAutomaticResetHook = false;
 
   let persistedThinking: string | undefined;
   let persistedVerbose: string | undefined;
@@ -255,6 +308,12 @@ export async function initSessionState(params: {
   const strippedForReset = isGroup
     ? stripMentions(triggerBodyNormalized, ctx, cfg, agentId)
     : triggerBodyNormalized;
+  const normalizedTrimmedBody = normalizeCommandBody(trimmedBody, {
+    botUsername: ctx.BotUsername,
+  });
+  const normalizedStrippedForReset = normalizeCommandBody(strippedForReset, {
+    botUsername: ctx.BotUsername,
+  });
   const shouldUseAcpInPlaceReset = Boolean(
     resolveBoundAcpSessionForReset({
       cfg,
@@ -262,13 +321,16 @@ export async function initSessionState(params: {
     }),
   );
   const shouldBypassAcpResetForTrigger = (triggerLower: string): boolean =>
-    shouldUseAcpInPlaceReset &&
-    DEFAULT_RESET_TRIGGERS.some((defaultTrigger) => defaultTrigger.toLowerCase() === triggerLower);
+    shouldUseAcpInPlaceReset && isAcpInPlaceResetCommand(triggerLower);
 
   // Reset triggers are configured as lowercased commands (e.g. "/new"), but users may type
   // "/NEW" etc. Match case-insensitively while keeping the original casing for any stripped body.
-  const trimmedBodyLower = trimmedBody.toLowerCase();
-  const strippedForResetLower = strippedForReset.toLowerCase();
+  const trimmedBodyLower = normalizedTrimmedBody.toLowerCase();
+  const strippedForResetLower = normalizedStrippedForReset.toLowerCase();
+  const manualResetCommandRequested =
+    resetAuthorized &&
+    (isAcpInPlaceResetCommand(trimmedBodyLower) || isAcpInPlaceResetCommand(strippedForResetLower));
+  suppressAutomaticResetHook = manualResetCommandRequested;
 
   for (const trigger of resetTriggers) {
     if (!trigger) {
@@ -278,28 +340,21 @@ export async function initSessionState(params: {
       break;
     }
     const triggerLower = trigger.toLowerCase();
-    if (trimmedBodyLower === triggerLower || strippedForResetLower === triggerLower) {
+    const trimmedMatchesTrigger = matchesCommandToken(trimmedBodyLower, triggerLower);
+    const strippedMatchesTrigger = matchesCommandToken(strippedForResetLower, triggerLower);
+    if (trimmedMatchesTrigger || strippedMatchesTrigger) {
       if (shouldBypassAcpResetForTrigger(triggerLower)) {
         // ACP-bound conversations handle /new and /reset in command handling
         // so the bound ACP runtime can be reset in place without rotating the
         // normal OpenClaw session/transcript.
+        suppressAutomaticResetHook = true;
         break;
       }
       isNewSession = true;
-      bodyStripped = "";
-      resetTriggered = true;
-      break;
-    }
-    const triggerPrefixLower = `${triggerLower} `;
-    if (
-      trimmedBodyLower.startsWith(triggerPrefixLower) ||
-      strippedForResetLower.startsWith(triggerPrefixLower)
-    ) {
-      if (shouldBypassAcpResetForTrigger(triggerLower)) {
-        break;
-      }
-      isNewSession = true;
-      bodyStripped = strippedForReset.slice(trigger.length).trimStart();
+      bodyStripped =
+        strippedForResetLower === triggerLower
+          ? ""
+          : normalizedStrippedForReset.slice(trigger.length).trimStart();
       resetTriggered = true;
       break;
     }
@@ -341,20 +396,36 @@ export async function initSessionState(params: {
     resetType,
     resetOverride: channelReset,
   });
-  const freshEntry = entry
-    ? evaluateSessionFreshness({ updatedAt: entry.updatedAt, now, policy: resetPolicy }).fresh
-    : false;
+  const freshness = entry
+    ? evaluateSessionFreshness({ updatedAt: entry.updatedAt, now, policy: resetPolicy })
+    : undefined;
+  const freshEntry = freshness?.fresh ?? false;
+  const preserveBoundAcpSessionForResetCommand =
+    shouldUseAcpInPlaceReset && manualResetCommandRequested && Boolean(entry);
+  const automaticResetAction = entry
+    ? resolveAutomaticSessionResetAction({
+        updatedAt: entry.updatedAt,
+        now,
+        dailyResetAt: freshness?.dailyResetAt,
+        idleExpiresAt: freshness?.idleExpiresAt,
+        resetTriggered,
+        suppressForResetCommand: suppressAutomaticResetHook,
+      })
+    : undefined;
   // Capture the current session entry before any reset so its transcript can be
   // archived afterward.  We need to do this for both explicit resets (/new, /reset)
   // and for scheduled/daily resets where the session has become stale (!freshEntry).
   // Without this, daily-reset transcripts are left as orphaned files on disk (#35481).
-  const previousSessionEntry = (resetTriggered || !freshEntry) && entry ? { ...entry } : undefined;
+  const previousSessionEntry =
+    (resetTriggered || (!freshEntry && !preserveBoundAcpSessionForResetCommand)) && entry
+      ? { ...entry }
+      : undefined;
   clearBootstrapSnapshotOnSessionRollover({
     sessionKey,
     previousSessionId: previousSessionEntry?.sessionId,
   });
 
-  if (!isNewSession && freshEntry) {
+  if (!isNewSession && (freshEntry || preserveBoundAcpSessionForResetCommand)) {
     sessionId = entry.sessionId;
     systemSent = entry.systemSent ?? false;
     abortedLastRun = entry.abortedLastRun ?? false;
@@ -390,7 +461,8 @@ export async function initSessionState(params: {
     }
   }
 
-  const baseEntry = !isNewSession && freshEntry ? entry : undefined;
+  const baseEntry =
+    !isNewSession && (freshEntry || preserveBoundAcpSessionForResetCommand) ? entry : undefined;
   // Track the originating channel/to for announce routing (subagent announce-back).
   const originatingChannelRaw = ctx.OriginatingChannel as string | undefined;
   const lastChannelRaw = resolveLastChannelRaw({
@@ -567,6 +639,20 @@ export async function initSessionState(params: {
         }),
     },
   );
+
+  if (automaticResetAction && previousSessionEntry) {
+    const source =
+      ctx.OriginatingChannel?.trim() || ctx.Surface?.trim() || ctx.Provider?.trim() || undefined;
+    await triggerInternalHook(
+      createInternalHookEvent("session", automaticResetAction, sessionKey, {
+        cfg,
+        commandSource: source,
+        previousSessionEntry,
+        sessionEntry,
+        workspaceDir: resolveAgentWorkspaceDir(cfg, agentId),
+      }),
+    );
+  }
 
   // Archive old transcript so it doesn't accumulate on disk (#14869).
   if (previousSessionEntry?.sessionId) {
