@@ -1,7 +1,7 @@
 import {
   isSlackExecApprovalApprover,
   isSlackExecApprovalClientEnabled,
-} from "../../../extensions/slack/src/exec-approvals.js";
+} from "../../../extensions/slack/exec-approvals-api.js";
 import {
   isTelegramExecApprovalApprover,
   isTelegramExecApprovalClientEnabled,

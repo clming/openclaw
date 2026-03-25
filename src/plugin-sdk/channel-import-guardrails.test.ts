@@ -10,6 +10,7 @@ const ALLOWED_EXTENSION_PUBLIC_SURFACES = new Set([
   "action-runtime-api.js",
   "allow-from.js",
   "api.js",
+  "exec-approvals-api.js",
   "auth-presence.js",
   "index.js",
   "light-runtime-api.js",
