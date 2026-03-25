@@ -1,0 +1,617 @@
+import fsp from "node:fs/promises";
+import path from "node:path";
+import JSON5 from "json5";
+import { resolveGatewayLockDir } from "../config/paths.js";
+import { resolveGatewayService } from "../daemon/service.js";
+import { writeJsonAtomic } from "../infra/json-files.js";
+import {
+  createProfileSpec,
+  hasInvalidManagedManifest,
+  importLegacyProfile,
+  listProfiles,
+  managedProfileManifestExists,
+  readManagedProfile,
+  requireValidProfileId,
+  resolveManagedProfileRoot,
+  resolveProfileSelection,
+  suggestProfileBasePort,
+  type ProfileSpec,
+  type ResolvedProfile,
+  writeManagedProfileSpec,
+} from "../profiles/managed.js";
+import type { OutputRuntimeEnv } from "../runtime.js";
+import { writeRuntimeJson } from "../runtime.js";
+import { isPidAlive } from "../shared/pid-alive.js";
+import { randomToken } from "./onboard-helpers.js";
+
+const PROFILE_TOP_LEVEL_EXCLUDES = new Set([
+  "browser",
+  "canvas",
+  "completions",
+  "cron",
+  "delivery-queue",
+  "devices",
+  "heartbeat-policy",
+  "identity",
+  "logs",
+  "profiles",
+  "subagents",
+]);
+
+const PROFILE_FILE_EXCLUDES = new Set([
+  "openclaw.json",
+  "clawdbot.json",
+  "moldbot.json",
+  "openclaw.json.bak",
+  "openclaw.json.bak.1",
+  "openclaw.json.bak.2",
+  "openclaw.json.bak.3",
+  "openclaw.json.bak.4",
+  "update-check.json",
+]);
+
+type MutableRecord = Record<string, unknown>;
+
+function resolveCommandProfileId(raw: string): string {
+  return requireValidProfileId(raw);
+}
+
+function ensureProfileInsideRoot(profile: ResolvedProfile, target: string): boolean {
+  const relative = path.relative(profile.profileRoot, target);
+  return !(relative.startsWith("..") || path.isAbsolute(relative));
+}
+
+function normalizeConfigObject(raw: unknown): MutableRecord {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  return raw as MutableRecord;
+}
+
+async function readConfigObject(filePath: string): Promise<MutableRecord> {
+  try {
+    const raw = await fsp.readFile(filePath, "utf8");
+    return normalizeConfigObject(JSON5.parse(raw));
+  } catch (error) {
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : null;
+    if (code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function readCloneSourceConfigObject(filePath: string): Promise<MutableRecord> {
+  try {
+    return await readConfigObject(filePath);
+  } catch {
+    throw new Error(`Source config is unreadable: ${filePath}`);
+  }
+}
+
+function withRecord(value: unknown): MutableRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as MutableRecord)
+    : {};
+}
+
+function prepareConfigForProfile(params: {
+  config: MutableRecord;
+  destination: ResolvedProfile;
+  operation: "create" | "clone";
+}): MutableRecord {
+  const next = structuredClone(params.config);
+  const agents = withRecord(next.agents);
+  const defaults = withRecord(agents.defaults);
+  defaults.workspace = params.destination.workspaceDir;
+  agents.defaults = defaults;
+  next.agents = agents;
+
+  const gateway = withRecord(next.gateway);
+  const auth = withRecord(gateway.auth);
+  const mode = typeof auth.mode === "string" ? auth.mode : undefined;
+  const hasToken = typeof auth.token === "string" && auth.token.trim().length > 0;
+  if (params.operation === "clone" && (mode === "token" || (mode === undefined && hasToken))) {
+    auth.mode = "token";
+    auth.token = randomToken();
+    gateway.auth = auth;
+  }
+  gateway.port = params.destination.basePort;
+  next.gateway = gateway;
+
+  return next;
+}
+
+function classifyStateEntry(relativePath: string): "copy" | "skip" {
+  const normalized = relativePath.split(path.sep).filter(Boolean);
+  if (normalized.length === 0) {
+    return "copy";
+  }
+  if (PROFILE_FILE_EXCLUDES.has(normalized.at(-1) ?? "")) {
+    return "skip";
+  }
+  if (PROFILE_TOP_LEVEL_EXCLUDES.has(normalized[0] ?? "")) {
+    return "skip";
+  }
+  if (normalized[0] === "agents" && normalized.includes("sessions")) {
+    return "skip";
+  }
+  return "copy";
+}
+
+function isPathWithinRoot(root: string, candidate: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function copyProfileStateTree(params: {
+  sourceRoot: string;
+  destinationRoot: string;
+  relative?: string;
+  canonicalSourceRoot?: string;
+}) {
+  const relative = params.relative ?? "";
+  const sourceRoot = relative ? path.join(params.sourceRoot, relative) : params.sourceRoot;
+  const destinationRoot = relative
+    ? path.join(params.destinationRoot, relative)
+    : params.destinationRoot;
+  const canonicalSourceRoot =
+    params.canonicalSourceRoot ??
+    (await fsp.realpath(params.sourceRoot).catch(() => path.resolve(params.sourceRoot)));
+  await fsp.mkdir(destinationRoot, { recursive: true, mode: 0o700 });
+  let entries: Array<{
+    name: string;
+    isDirectory(): boolean;
+    isFile(): boolean;
+    isSymbolicLink(): boolean;
+  }>;
+  try {
+    entries = (await fsp.readdir(sourceRoot, { withFileTypes: true })) as Array<{
+      name: string;
+      isDirectory(): boolean;
+      isFile(): boolean;
+      isSymbolicLink(): boolean;
+    }>;
+  } catch (error) {
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : null;
+    if (code === "ENOENT") {
+      return;
+    }
+    throw new Error(`Profile clone could not read state directory: ${sourceRoot}`, {
+      cause: error,
+    });
+  }
+  for (const entry of entries) {
+    const childRelative = relative ? path.join(relative, entry.name) : entry.name;
+    if (classifyStateEntry(childRelative) === "skip") {
+      continue;
+    }
+    const srcPath = path.join(params.sourceRoot, childRelative);
+    const dstPath = path.join(params.destinationRoot, childRelative);
+    let stats: Awaited<ReturnType<typeof fsp.lstat>>;
+    try {
+      stats = await fsp.lstat(srcPath);
+    } catch (error) {
+      throw new Error(`Profile clone could not inspect state entry: ${srcPath}`, {
+        cause: error,
+      });
+    }
+    if (stats.isSymbolicLink()) {
+      continue;
+    }
+    let realPath: string;
+    try {
+      realPath = await fsp.realpath(srcPath);
+    } catch (error) {
+      throw new Error(`Profile clone could not resolve state entry path: ${srcPath}`, {
+        cause: error,
+      });
+    }
+    if (!isPathWithinRoot(canonicalSourceRoot, realPath)) {
+      continue;
+    }
+    if (stats.isDirectory()) {
+      await copyProfileStateTree({
+        sourceRoot: params.sourceRoot,
+        destinationRoot: params.destinationRoot,
+        relative: childRelative,
+        canonicalSourceRoot,
+      });
+      continue;
+    }
+    if (stats.isFile()) {
+      await fsp.mkdir(path.dirname(dstPath), { recursive: true, mode: 0o700 });
+      try {
+        await fsp.copyFile(srcPath, dstPath);
+      } catch (error) {
+        throw new Error(`Profile clone could not copy state entry: ${srcPath}`, {
+          cause: error,
+        });
+      }
+    }
+  }
+}
+
+async function chooseBasePort(profileId: string): Promise<number> {
+  const id = resolveCommandProfileId(profileId);
+  const preferredPort = id === "default" ? 18789 : id === "dev" ? 19001 : undefined;
+  if (preferredPort) {
+    const existing = await listProfiles();
+    if (!existing.some((profile) => profile.effectiveGatewayPort === preferredPort)) {
+      return preferredPort;
+    }
+  }
+  return suggestProfileBasePort();
+}
+
+function formatProfileSummary(profile: ResolvedProfile) {
+  return {
+    id: profile.id,
+    kind: profile.kind,
+    mode: profile.mode,
+    managed: profile.managed,
+    exists: profile.exists,
+    profileRoot: profile.profileRoot,
+    manifestPath: profile.manifestPath,
+    configPath: profile.configPath,
+    stateDir: profile.stateDir,
+    workspaceDir: profile.workspaceDir,
+    basePort: profile.basePort,
+    effectiveGatewayPort: profile.effectiveGatewayPort,
+    configuredGatewayPort: profile.configuredGatewayPort,
+    createdAt: profile.createdAt,
+    createdFrom: profile.createdFrom,
+    adoptedFromLegacy: profile.adoptedFromLegacy,
+    warnings: profile.warnings,
+  };
+}
+
+async function buildDoctorReport(profile: ResolvedProfile) {
+  const warnings = [...profile.warnings];
+  const config = await readConfigObject(profile.configPath);
+  const agents = withRecord(config.agents);
+  const defaults = withRecord(agents.defaults);
+  const configuredWorkspace =
+    typeof defaults.workspace === "string" && defaults.workspace.trim().length > 0
+      ? path.resolve(defaults.workspace)
+      : null;
+  if (configuredWorkspace && configuredWorkspace !== path.resolve(profile.workspaceDir)) {
+    warnings.push(
+      `agents.defaults.workspace diverges from the managed profile workspace (configured: ${configuredWorkspace}, expected: ${path.resolve(profile.workspaceDir)})`,
+    );
+  }
+  const gateway = withRecord(config.gateway);
+  const configPort = gateway.port;
+  if (
+    typeof configPort === "number" &&
+    Number.isFinite(configPort) &&
+    configPort > 0 &&
+    configPort !== profile.effectiveGatewayPort
+  ) {
+    warnings.push(
+      `gateway.port (${configPort}) diverges from effectiveGatewayPort (${profile.effectiveGatewayPort})`,
+    );
+  }
+  if (profile.managed && profile.mode === "managed-native") {
+    if (!ensureProfileInsideRoot(profile, profile.stateDir)) {
+      warnings.push("state dir escapes the profile root");
+    }
+    if (!ensureProfileInsideRoot(profile, profile.configPath)) {
+      warnings.push("config path escapes the profile root");
+    }
+    if (!ensureProfileInsideRoot(profile, profile.workspaceDir)) {
+      warnings.push("workspace path escapes the profile root");
+    }
+  }
+  if (profile.mode === "legacy-unmanaged") {
+    warnings.push("legacy profile is not yet managed by profile.json");
+  }
+  return {
+    ...formatProfileSummary(profile),
+    warnings,
+    healthy: warnings.length === 0,
+  };
+}
+
+function writeProfileOutput(runtime: OutputRuntimeEnv, value: unknown, json: boolean) {
+  if (json) {
+    writeRuntimeJson(runtime, value);
+    return;
+  }
+  runtime.log(JSON.stringify(value, null, 2));
+}
+
+function buildProfileEnv(profile: ResolvedProfile): Record<string, string> {
+  return {
+    ...process.env,
+    OPENCLAW_PROFILE: profile.id,
+    OPENCLAW_STATE_DIR: profile.stateDir,
+    OPENCLAW_CONFIG_PATH: profile.configPath,
+    OPENCLAW_GATEWAY_PORT: String(profile.effectiveGatewayPort),
+  } as Record<string, string>;
+}
+
+async function canonicalizeProfilePathForComparison(input: string): Promise<string> {
+  const resolved = path.resolve(input);
+  try {
+    return await fsp.realpath(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+async function detectLiveGatewayLockReason(profile: ResolvedProfile): Promise<string | null> {
+  const lockDir = resolveGatewayLockDir();
+  const profileConfigPath = await canonicalizeProfilePathForComparison(profile.configPath);
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(lockDir);
+  } catch {
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (!/^gateway\.[0-9a-f]{8}\.lock$/i.test(entry)) {
+      continue;
+    }
+    try {
+      const raw = await fsp.readFile(path.join(lockDir, entry), "utf8");
+      const parsed = JSON.parse(raw) as { pid?: number; configPath?: string };
+      if (typeof parsed.pid !== "number" || parsed.pid <= 0 || !parsed.configPath) {
+        continue;
+      }
+      const lockConfigPath = await canonicalizeProfilePathForComparison(parsed.configPath);
+      if (lockConfigPath === profileConfigPath && isPidAlive(parsed.pid)) {
+        return `gateway lock is owned by live pid ${parsed.pid}`;
+      }
+    } catch {
+      // Ignore malformed or disappearing lock files.
+    }
+  }
+
+  return null;
+}
+
+async function detectLiveProfileReason(profile: ResolvedProfile): Promise<string | null> {
+  const activeProfile = process.env.OPENCLAW_PROFILE?.trim();
+  if (activeProfile) {
+    try {
+      if (requireValidProfileId(activeProfile) === profile.id) {
+        return "profile matches the active CLI environment";
+      }
+    } catch {
+      // Ignore invalid env values here and continue with explicit path checks.
+    }
+  }
+  const activeStateDir = process.env.OPENCLAW_STATE_DIR?.trim();
+  if (
+    activeStateDir &&
+    (await canonicalizeProfilePathForComparison(activeStateDir)) ===
+      (await canonicalizeProfilePathForComparison(profile.stateDir))
+  ) {
+    return "profile state dir matches the active CLI environment";
+  }
+  const activeConfigPath = process.env.OPENCLAW_CONFIG_PATH?.trim();
+  if (
+    activeConfigPath &&
+    (await canonicalizeProfilePathForComparison(activeConfigPath)) ===
+      (await canonicalizeProfilePathForComparison(profile.configPath))
+  ) {
+    return "profile config path matches the active CLI environment";
+  }
+
+  try {
+    const service = resolveGatewayService();
+    const env = buildProfileEnv(profile);
+    if (await service.isLoaded({ env })) {
+      const runtime = await service.readRuntime(env);
+      if (runtime.status === "running" || runtime.state === "running") {
+        return "gateway service is installed and running";
+      }
+      if (typeof runtime.pid === "number" && runtime.pid > 0 && isPidAlive(runtime.pid)) {
+        return `gateway service runtime pid ${runtime.pid} is alive`;
+      }
+    }
+  } catch {
+    // Best effort only; fall through to lock inspection.
+  }
+
+  const lockReason = await detectLiveGatewayLockReason(profile);
+  if (lockReason) {
+    return lockReason;
+  }
+
+  return null;
+}
+
+export async function profileListCommand(
+  runtime: OutputRuntimeEnv,
+  opts: { json?: boolean },
+): Promise<void> {
+  const profiles = await listProfiles();
+  writeProfileOutput(runtime, { items: profiles.map(formatProfileSummary) }, Boolean(opts.json));
+}
+
+export async function profileGetCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const profile = await resolveProfileSelection(resolveCommandProfileId(profileId));
+  writeProfileOutput(runtime, formatProfileSummary(profile), Boolean(opts.json));
+}
+
+export async function profilePathsCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const profile = await resolveProfileSelection(resolveCommandProfileId(profileId));
+  writeProfileOutput(
+    runtime,
+    {
+      id: profile.id,
+      profileRoot: profile.profileRoot,
+      manifestPath: profile.manifestPath,
+      configPath: profile.configPath,
+      stateDir: profile.stateDir,
+      workspaceDir: profile.workspaceDir,
+    },
+    Boolean(opts.json),
+  );
+}
+
+export async function profileCreateCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const id = resolveCommandProfileId(profileId);
+  const existingManaged = await readManagedProfile(id);
+  if (hasInvalidManagedManifest(existingManaged)) {
+    throw new Error(`Managed profile manifest exists but is unreadable: ${id}`);
+  }
+  if (existingManaged) {
+    throw new Error(`Managed profile already exists: ${id}`);
+  }
+  if (managedProfileManifestExists(id)) {
+    throw new Error(`Managed profile manifest exists but is unreadable: ${id}`);
+  }
+  const existingSelection = await resolveProfileSelection(id);
+  if (existingSelection.mode === "legacy-unmanaged") {
+    throw new Error(
+      `Legacy profile already exists: ${id}. Use "openclaw profile import ${id}" instead.`,
+    );
+  }
+
+  const basePort = await chooseBasePort(id);
+  const spec: ProfileSpec = createProfileSpec({ id, basePort });
+  const destination = await writeManagedProfileSpec(spec);
+  const freshConfig = prepareConfigForProfile({
+    config: {},
+    destination,
+    operation: "create",
+  });
+  await writeJsonAtomic(destination.configPath, freshConfig, {
+    mode: 0o600,
+    trailingNewline: true,
+    ensureDirMode: 0o700,
+  });
+
+  writeProfileOutput(runtime, formatProfileSummary(destination), Boolean(opts.json));
+}
+
+export async function profileCloneCommand(
+  runtime: OutputRuntimeEnv,
+  sourceId: string,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const id = resolveCommandProfileId(profileId);
+  const existingManaged = await readManagedProfile(id);
+  if (hasInvalidManagedManifest(existingManaged)) {
+    throw new Error(`Managed profile manifest exists but is unreadable: ${id}`);
+  }
+  if (existingManaged) {
+    throw new Error(`Managed profile already exists: ${id}`);
+  }
+  if (managedProfileManifestExists(id)) {
+    throw new Error(`Managed profile manifest exists but is unreadable: ${id}`);
+  }
+  const existingSelection = await resolveProfileSelection(id);
+  if (existingSelection.mode === "legacy-unmanaged") {
+    throw new Error(
+      `Legacy profile already exists: ${id}. Use "openclaw profile import ${id}" instead.`,
+    );
+  }
+
+  const source = await resolveProfileSelection(resolveCommandProfileId(sourceId));
+  if (hasInvalidManagedManifest(source)) {
+    throw new Error(`Source profile manifest is unreadable: ${resolveCommandProfileId(sourceId)}`);
+  }
+  if (!source.exists) {
+    throw new Error(`Source profile not found: ${resolveCommandProfileId(sourceId)}`);
+  }
+  const sourceConfig = await readCloneSourceConfigObject(source.configPath);
+
+  const basePort = await chooseBasePort(id);
+  const spec: ProfileSpec = createProfileSpec({
+    id,
+    basePort,
+    createdFrom: source.id,
+  });
+  const destination = await writeManagedProfileSpec(spec);
+  try {
+    const nextConfig = prepareConfigForProfile({
+      config: sourceConfig,
+      destination,
+      operation: "clone",
+    });
+    await writeJsonAtomic(destination.configPath, nextConfig, {
+      mode: 0o600,
+      trailingNewline: true,
+      ensureDirMode: 0o700,
+    });
+    await copyProfileStateTree({
+      sourceRoot: source.stateDir,
+      destinationRoot: destination.stateDir,
+    });
+  } catch (error) {
+    await fsp.rm(destination.profileRoot, { recursive: true, force: true });
+    throw error;
+  }
+
+  writeProfileOutput(runtime, formatProfileSummary(destination), Boolean(opts.json));
+}
+
+export async function profileImportCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const profile = await importLegacyProfile(resolveCommandProfileId(profileId));
+  writeProfileOutput(runtime, formatProfileSummary(profile), Boolean(opts.json));
+}
+
+export async function profileDoctorCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { json?: boolean },
+): Promise<void> {
+  const profile = await resolveProfileSelection(resolveCommandProfileId(profileId));
+  const report = await buildDoctorReport(profile);
+  writeProfileOutput(runtime, report, Boolean(opts.json));
+}
+
+export async function profileDeleteCommand(
+  runtime: OutputRuntimeEnv,
+  profileId: string,
+  opts: { yes?: boolean; force?: boolean; json?: boolean },
+): Promise<void> {
+  const id = resolveCommandProfileId(profileId);
+  const profile = await readManagedProfile(id);
+  if (!profile) {
+    throw new Error(`Managed profile not found: ${id}`);
+  }
+  if (!opts.yes) {
+    throw new Error("profile delete requires --yes");
+  }
+  const liveReason = await detectLiveProfileReason(profile);
+  if (liveReason && !opts.force) {
+    throw new Error(`Refusing to delete a live profile: ${liveReason}`);
+  }
+  await fsp.rm(resolveManagedProfileRoot(id), { recursive: true, force: true });
+  writeProfileOutput(runtime, { ok: true, deleted: id }, Boolean(opts.json));
+}

@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { withTempHome } from "../../test/helpers/temp-home.js";
+import { applyCliProfileEnv } from "../cli/profile.js";
+import { readManagedProfile } from "../profiles/managed.js";
 import { setupCommand } from "./setup.js";
 
 describe("setupCommand", () => {
@@ -12,14 +14,15 @@ describe("setupCommand", () => {
         error: vi.fn(),
         exit: vi.fn(),
       };
+      const workspace = path.join(home, "workspace");
 
-      await setupCommand(undefined, runtime);
+      await setupCommand({ workspace }, runtime);
 
       const configPath = path.join(home, ".openclaw", "openclaw.json");
       const raw = await fs.readFile(configPath, "utf-8");
 
       expect(raw).toContain('"mode": "local"');
-      expect(raw).toContain('"workspace"');
+      expect(raw).toContain(`"workspace": "${workspace}"`);
     });
   });
 
@@ -55,6 +58,104 @@ describe("setupCommand", () => {
 
       expect(raw.agents?.defaults?.workspace).toBe(workspace);
       expect(raw.gateway?.mode).toBe("local");
+    });
+  });
+
+  it("allocates distinct managed profile ports when setup bootstraps multiple profiles", async () => {
+    await withTempHome(async (home) => {
+      const runtime = {
+        log: vi.fn(),
+        error: vi.fn(),
+        exit: vi.fn(),
+      };
+      process.env.OPENCLAW_HOME = home;
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      process.env.OPENCLAW_PROFILE = "work-a";
+      await setupCommand({ workspace: path.join(home, "workspace-a") }, runtime);
+      process.env.OPENCLAW_PROFILE = "work-b";
+      await setupCommand({ workspace: path.join(home, "workspace-b") }, runtime);
+
+      const env = { ...process.env, OPENCLAW_HOME: home } as NodeJS.ProcessEnv;
+      const first = await readManagedProfile("work-a", env, () => home);
+      const second = await readManagedProfile("work-b", env, () => home);
+      expect(first?.basePort).toBeDefined();
+      expect(second?.basePort).toBeDefined();
+      expect(first?.basePort).not.toBe(second?.basePort);
+    });
+  });
+
+  it("bootstraps a managed profile when profile paths were auto-filled by CLI selection", async () => {
+    await withTempHome(async (home) => {
+      const runtime = {
+        log: vi.fn(),
+        error: vi.fn(),
+        exit: vi.fn(),
+      };
+      process.env.OPENCLAW_HOME = home;
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+      applyCliProfileEnv({
+        profile: "work-auto",
+        env: process.env as Record<string, string | undefined>,
+        homedir: () => home,
+      });
+
+      await setupCommand({ workspace: path.join(home, "workspace-auto") }, runtime);
+
+      const profile = await readManagedProfile("work-auto", process.env, () => home);
+      expect(profile?.managed).toBe(true);
+      expect(profile?.exists).toBe(true);
+    });
+  });
+
+  it("fails fast when selected profile manifest exists but is unreadable", async () => {
+    await withTempHome(async (home) => {
+      const runtime = {
+        log: vi.fn(),
+        error: vi.fn(),
+        exit: vi.fn(),
+      };
+      process.env.OPENCLAW_HOME = home;
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+      applyCliProfileEnv({
+        profile: "broken",
+        env: process.env as Record<string, string | undefined>,
+        homedir: () => home,
+      });
+
+      const profileRoot = path.join(home, ".openclaw", "profiles", "broken");
+      await fs.mkdir(profileRoot, { recursive: true });
+      await fs.writeFile(path.join(profileRoot, "profile.json"), "{not-json", "utf8");
+
+      await expect(
+        setupCommand({ workspace: path.join(home, "workspace-broken") }, runtime),
+      ).rejects.toThrow(/manifest exists but is unreadable/i);
+    });
+  });
+
+  it("rejects invalid OPENCLAW_PROFILE values before bootstrapping managed metadata", async () => {
+    await withTempHome(async (home) => {
+      const runtime = {
+        log: vi.fn(),
+        error: vi.fn(),
+        exit: vi.fn(),
+      };
+      process.env.OPENCLAW_HOME = home;
+      process.env.OPENCLAW_PROFILE = "bad profile";
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+
+      await expect(
+        setupCommand({ workspace: path.join(home, "workspace-bad") }, runtime),
+      ).rejects.toThrow(/invalid profile id/i);
+
+      const defaultProfile = await readManagedProfile("default", process.env, () => home);
+      expect(defaultProfile).toBeNull();
     });
   });
 });

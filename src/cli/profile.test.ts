@@ -1,5 +1,7 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { withTempDir } from "../test-helpers/temp-dir.js";
 import { formatCliCommand } from "./command-format.js";
 import { applyCliProfileEnv, parseCliProfileArgs } from "./profile.js";
 
@@ -94,18 +96,19 @@ describe("parseCliProfileArgs", () => {
 });
 
 describe("applyCliProfileEnv", () => {
-  it("fills env defaults for dev profile", () => {
+  it("fills env defaults for dev profile using managed profile paths", () => {
     const env: Record<string, string | undefined> = {};
     applyCliProfileEnv({
       profile: "dev",
       env,
       homedir: () => "/home/peter",
     });
-    const expectedStateDir = path.join(path.resolve("/home/peter"), ".openclaw-dev");
+    const expectedRoot = path.join(path.resolve("/home/peter"), ".openclaw", "profiles", "dev");
     expect(env.OPENCLAW_PROFILE).toBe("dev");
-    expect(env.OPENCLAW_STATE_DIR).toBe(expectedStateDir);
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(expectedStateDir, "openclaw.json"));
-    expect(env.OPENCLAW_GATEWAY_PORT).toBe("19001");
+    expect(env.OPENCLAW_STATE_DIR).toBe(path.join(expectedRoot, "state"));
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(expectedRoot, "config", "openclaw.json"));
+    expect(env.OPENCLAW_GATEWAY_PORT).toBeUndefined();
+    expect(env.OPENCLAW_PROFILE_AUTO_PATHS).toBe("1");
   });
 
   it("does not override explicit env values", () => {
@@ -121,6 +124,20 @@ describe("applyCliProfileEnv", () => {
     expect(env.OPENCLAW_STATE_DIR).toBe("/custom");
     expect(env.OPENCLAW_GATEWAY_PORT).toBe("19099");
     expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join("/custom", "openclaw.json"));
+    expect(env.OPENCLAW_PROFILE_AUTO_PATHS).toBeUndefined();
+  });
+
+  it("does not inject a profile gateway port when explicit state dir is set", () => {
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_STATE_DIR: "/custom",
+    };
+    applyCliProfileEnv({
+      profile: "dev",
+      env,
+      homedir: () => "/home/peter",
+    });
+    expect(env.OPENCLAW_GATEWAY_PORT).toBeUndefined();
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join("/custom", "openclaw.json"));
   });
 
   it("uses OPENCLAW_HOME when deriving profile state dir", () => {
@@ -135,10 +152,85 @@ describe("applyCliProfileEnv", () => {
     });
 
     const resolvedHome = path.resolve("/srv/openclaw-home");
-    expect(env.OPENCLAW_STATE_DIR).toBe(path.join(resolvedHome, ".openclaw-work"));
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(
-      path.join(resolvedHome, ".openclaw-work", "openclaw.json"),
+    expect(env.OPENCLAW_STATE_DIR).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "work", "state"),
     );
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "work", "config", "openclaw.json"),
+    );
+  });
+
+  it("uses managed default profile paths when no legacy default exists", () => {
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_HOME: "/srv/openclaw-home",
+    };
+    applyCliProfileEnv({
+      profile: "default",
+      env,
+      homedir: () => "/home/fallback",
+    });
+
+    const resolvedHome = path.resolve("/srv/openclaw-home");
+    expect(env.OPENCLAW_STATE_DIR).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "default", "state"),
+    );
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "default", "config", "openclaw.json"),
+    );
+  });
+
+  it("prefers an existing legacy profile directory over implicit managed paths", async () => {
+    await withTempDir({ prefix: "openclaw-profile-legacy-" }, async (root) => {
+      const legacyDir = path.join(root, ".openclaw-work");
+      await fs.mkdir(legacyDir, { recursive: true });
+      const env: Record<string, string | undefined> = {
+        OPENCLAW_HOME: root,
+      };
+      applyCliProfileEnv({
+        profile: "work",
+        env,
+        homedir: () => root,
+      });
+      expect(env.OPENCLAW_STATE_DIR).toBe(legacyDir);
+      expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(legacyDir, "openclaw.json"));
+    });
+  });
+
+  it("exports a gateway port for an existing legacy dev profile", async () => {
+    await withTempDir({ prefix: "openclaw-profile-dev-legacy-" }, async (root) => {
+      const legacyDir = path.join(root, ".openclaw-dev");
+      await fs.mkdir(legacyDir, { recursive: true });
+      const env: Record<string, string | undefined> = {
+        OPENCLAW_HOME: root,
+      };
+      applyCliProfileEnv({
+        profile: "dev",
+        env,
+        homedir: () => root,
+      });
+      expect(env.OPENCLAW_GATEWAY_PORT).toBe("19001");
+    });
+  });
+
+  it("does not inject OPENCLAW_GATEWAY_PORT for a brand-new implicit profile", () => {
+    const env: Record<string, string | undefined> = {
+      OPENCLAW_HOME: "/srv/openclaw-home",
+    };
+    applyCliProfileEnv({
+      profile: "fresh",
+      env,
+      homedir: () => "/home/fallback",
+    });
+
+    const resolvedHome = path.resolve("/srv/openclaw-home");
+    expect(env.OPENCLAW_STATE_DIR).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "fresh", "state"),
+    );
+    expect(env.OPENCLAW_CONFIG_PATH).toBe(
+      path.join(resolvedHome, ".openclaw", "profiles", "fresh", "config", "openclaw.json"),
+    );
+    expect(env.OPENCLAW_PROFILE_AUTO_PATHS).toBe("1");
+    expect(env.OPENCLAW_GATEWAY_PORT).toBeUndefined();
   });
 });
 
@@ -154,13 +246,13 @@ describe("formatCliCommand", () => {
       name: "profile is default",
       cmd: "openclaw doctor --fix",
       env: { OPENCLAW_PROFILE: "default" },
-      expected: "openclaw doctor --fix",
+      expected: "openclaw --profile default doctor --fix",
     },
     {
       name: "profile is Default (case-insensitive)",
       cmd: "openclaw doctor --fix",
       env: { OPENCLAW_PROFILE: "Default" },
-      expected: "openclaw doctor --fix",
+      expected: "openclaw --profile default doctor --fix",
     },
     {
       name: "profile is invalid",
@@ -219,6 +311,15 @@ describe("formatCliCommand", () => {
       formatCliCommand("openclaw doctor", {
         OPENCLAW_CONTAINER_HINT: "demo",
         OPENCLAW_PROFILE: "work",
+      }),
+    ).toBe("openclaw --container demo doctor");
+  });
+
+  it("preserves an explicit default profile alongside container hints", () => {
+    expect(
+      formatCliCommand("openclaw doctor", {
+        OPENCLAW_CONTAINER_HINT: "demo",
+        OPENCLAW_PROFILE: "default",
       }),
     ).toBe("openclaw --container demo doctor");
   });

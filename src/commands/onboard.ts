@@ -1,6 +1,8 @@
 import { formatCliCommand } from "../cli/command-format.js";
 import { readConfigFileSnapshot } from "../config/config.js";
+import { clearProfilePathCache } from "../config/paths.js";
 import { assertSupportedRuntime } from "../infra/runtime-guard.js";
+import { ensureManagedProfile, requireValidProfileId } from "../profiles/managed.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
 import { resolveUserPath } from "../utils.js";
@@ -66,6 +68,16 @@ export async function setupWizardCommand(
     );
     runtime.exit(1);
     return;
+  }
+
+  const selectedProfile = process.env.OPENCLAW_PROFILE?.trim();
+  const autoProfilePaths = process.env.OPENCLAW_PROFILE_AUTO_PATHS === "1";
+  const hasExplicitPathOverride =
+    Boolean(process.env.OPENCLAW_STATE_DIR?.trim()) ||
+    Boolean(process.env.OPENCLAW_CONFIG_PATH?.trim());
+  if (selectedProfile && (!hasExplicitPathOverride || autoProfilePaths)) {
+    await ensureManagedProfile(requireValidProfileId(selectedProfile));
+    clearProfilePathCache();
   }
 
   if (normalizedOpts.reset) {

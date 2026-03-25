@@ -1,5 +1,8 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { withTempHome } from "../../test/helpers/temp-home.js";
+import { applyCliProfileEnv } from "../cli/profile.js";
+import { readManagedProfile } from "../profiles/managed.js";
 import type { RuntimeEnv } from "../runtime.js";
 
 const mocks = vi.hoisted(() => ({
@@ -43,21 +46,35 @@ describe("setupWizardCommand", () => {
   });
 
   it("fails fast for invalid secret-input-mode before setup starts", async () => {
-    const runtime = makeRuntime();
+    await withTempHome(async (home) => {
+      const runtime = makeRuntime();
+      process.env.OPENCLAW_HOME = home;
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+      applyCliProfileEnv({
+        profile: "invalid-onboard",
+        env: process.env as Record<string, string | undefined>,
+        homedir: () => home,
+      });
 
-    await setupWizardCommand(
-      {
-        secretInputMode: "invalid" as never, // pragma: allowlist secret
-      },
-      runtime,
-    );
+      await setupWizardCommand(
+        {
+          secretInputMode: "invalid" as never, // pragma: allowlist secret
+        },
+        runtime,
+      );
 
-    expect(runtime.error).toHaveBeenCalledWith(
-      'Invalid --secret-input-mode. Use "plaintext" or "ref".',
-    );
-    expect(runtime.exit).toHaveBeenCalledWith(1);
-    expect(mocks.runInteractiveSetup).not.toHaveBeenCalled();
-    expect(mocks.runNonInteractiveSetup).not.toHaveBeenCalled();
+      expect(runtime.error).toHaveBeenCalledWith(
+        'Invalid --secret-input-mode. Use "plaintext" or "ref".',
+      );
+      expect(runtime.exit).toHaveBeenCalledWith(1);
+      expect(mocks.runInteractiveSetup).not.toHaveBeenCalled();
+      expect(mocks.runNonInteractiveSetup).not.toHaveBeenCalled();
+
+      const profile = await readManagedProfile("invalid-onboard", process.env, () => home);
+      expect(profile).toBeNull();
+    });
   });
 
   it("logs ASCII-safe Windows guidance before setup", async () => {
@@ -137,6 +154,43 @@ describe("setupWizardCommand", () => {
     );
 
     expect(mocks.handleReset).toHaveBeenCalledWith("full", expect.any(String), runtime);
+  });
+
+  it("bootstraps a managed profile when onboard runs with auto-filled profile paths", async () => {
+    await withTempHome(async (home) => {
+      const runtime = makeRuntime();
+      process.env.OPENCLAW_HOME = home;
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+      applyCliProfileEnv({
+        profile: "onboard-auto",
+        env: process.env as Record<string, string | undefined>,
+        homedir: () => home,
+      });
+
+      await setupWizardCommand({}, runtime);
+
+      const profile = await readManagedProfile("onboard-auto", process.env, () => home);
+      expect(profile?.managed).toBe(true);
+      expect(mocks.runInteractiveSetup).toHaveBeenCalled();
+    });
+  });
+
+  it("rejects invalid OPENCLAW_PROFILE values before bootstrapping managed metadata", async () => {
+    await withTempHome(async (home) => {
+      const runtime = makeRuntime();
+      process.env.OPENCLAW_HOME = home;
+      process.env.OPENCLAW_PROFILE = "bad profile";
+      delete process.env.OPENCLAW_STATE_DIR;
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      delete process.env.OPENCLAW_GATEWAY_PORT;
+
+      await expect(setupWizardCommand({}, runtime)).rejects.toThrow(/invalid profile id/i);
+
+      const defaultProfile = await readManagedProfile("default", process.env, () => home);
+      expect(defaultProfile).toBeNull();
+    });
   });
 
   it("fails fast for invalid --reset-scope", async () => {
