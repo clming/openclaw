@@ -382,6 +382,7 @@ export async function prepareSlackMessage(params: {
         },
       }));
   const implicitMention = Boolean(
+    ctx.autoReplyOnParticipation &&
     !isDirectMessage &&
     ctx.botUserId &&
     message.thread_ts &&
