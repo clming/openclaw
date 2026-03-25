@@ -54,7 +54,7 @@ RUN curl -L https://github.com/steipete/wacli/releases/latest/download/wacli_Lin
 # Add more binaries below using the same pattern
 
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc postinstall.mjs ./
 COPY ui/package.json ./ui/package.json
 COPY scripts ./scripts
 

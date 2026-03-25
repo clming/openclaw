@@ -253,7 +253,7 @@ See the [`ClawDock` Helper README](https://github.com/openclaw/openclaw/blob/mai
     ENV PATH="/root/.bun/bin:${PATH}"
     RUN corepack enable
     WORKDIR /app
-    COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+    COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc postinstall.mjs ./
     COPY ui/package.json ./ui/package.json
     COPY scripts ./scripts
     RUN pnpm install --frozen-lockfile

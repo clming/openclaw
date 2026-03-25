@@ -119,4 +119,26 @@ describe("resolveGatewayProgramArguments", () => {
     ]);
     expect(result.workingDirectory).toBe(path.resolve("/repo"));
   });
+
+  it("reuses an explicit bun path for packaged gateway services", async () => {
+    const entryPath = path.resolve("/opt/homebrew/lib/node_modules/openclaw/dist/index.js");
+    process.argv = ["/usr/local/bin/node", entryPath];
+    fsMocks.realpath.mockResolvedValue(entryPath);
+    fsMocks.access.mockResolvedValue(undefined);
+
+    const result = await resolveGatewayProgramArguments({
+      port: 18789,
+      runtime: "bun",
+      bunPath: "/Users/test/.bun/bin/bun",
+    });
+
+    expect(result.programArguments).toEqual([
+      "/Users/test/.bun/bin/bun",
+      entryPath,
+      "gateway",
+      "--port",
+      "18789",
+    ]);
+    expect(childProcessMocks.execFileSync).not.toHaveBeenCalled();
+  });
 });

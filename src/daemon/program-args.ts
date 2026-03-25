@@ -164,6 +164,7 @@ async function resolveCliProgramArguments(params: {
   dev?: boolean;
   runtime?: GatewayRuntimePreference;
   nodePath?: string;
+  bunPath?: string;
 }): Promise<GatewayProgramArgs> {
   const execPath = process.execPath;
   const runtime = params.runtime ?? "auto";
@@ -182,14 +183,15 @@ async function resolveCliProgramArguments(params: {
       const repoRoot = resolveRepoRootForDev();
       const devCliPath = path.join(repoRoot, "src", "entry.ts");
       await fs.access(devCliPath);
-      const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath();
+      const bunPath =
+        params.bunPath ?? (isBunRuntime(execPath) ? execPath : await resolveBunPath());
       return {
         programArguments: [bunPath, devCliPath, ...params.args],
         workingDirectory: repoRoot,
       };
     }
 
-    const bunPath = isBunRuntime(execPath) ? execPath : await resolveBunPath();
+    const bunPath = params.bunPath ?? (isBunRuntime(execPath) ? execPath : await resolveBunPath());
     const cliEntrypointPath = await resolveCliEntrypointPathForService();
     return {
       programArguments: [bunPath, cliEntrypointPath, ...params.args],
@@ -237,6 +239,7 @@ export async function resolveGatewayProgramArguments(params: {
   dev?: boolean;
   runtime?: GatewayRuntimePreference;
   nodePath?: string;
+  bunPath?: string;
 }): Promise<GatewayProgramArgs> {
   const gatewayArgs = ["gateway", "--port", String(params.port)];
   return resolveCliProgramArguments({
@@ -244,6 +247,7 @@ export async function resolveGatewayProgramArguments(params: {
     dev: params.dev,
     runtime: params.runtime,
     nodePath: params.nodePath,
+    bunPath: params.bunPath,
   });
 }
 
@@ -257,6 +261,7 @@ export async function resolveNodeProgramArguments(params: {
   dev?: boolean;
   runtime?: GatewayRuntimePreference;
   nodePath?: string;
+  bunPath?: string;
 }): Promise<GatewayProgramArgs> {
   const args = ["node", "run", "--host", params.host, "--port", String(params.port)];
   if (params.tls || params.tlsFingerprint) {
@@ -276,5 +281,6 @@ export async function resolveNodeProgramArguments(params: {
     dev: params.dev,
     runtime: params.runtime,
     nodePath: params.nodePath,
+    bunPath: params.bunPath,
   });
 }
