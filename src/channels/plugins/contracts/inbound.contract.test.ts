@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildDiscordInboundAccessContext } from "../../../../extensions/discord/src/monitor/inbound-context.js";
 import type { ResolvedSlackAccount } from "../../../../extensions/slack/src/accounts.js";
 import type { SlackMessageEvent } from "../../../../extensions/slack/src/types.js";
 import { withTempHome } from "../../../../test/helpers/temp-home.js";
@@ -74,14 +73,6 @@ vi.mock("../../../../extensions/whatsapp/src/auto-reply/deliver-reply.js", () =>
   deliverWebReply: vi.fn(async () => {}),
 }));
 
-const { finalizeInboundContext } = await import("../../../auto-reply/reply/inbound-context.js");
-const { prepareSlackMessage } =
-  await import("../../../../extensions/slack/src/monitor/message-handler/prepare.js");
-const { createInboundSlackTestContext } =
-  await import("../../../../extensions/slack/src/monitor/message-handler/prepare.test-helpers.js");
-const { buildTelegramMessageContextForTest } =
-  await import("../../../../extensions/telegram/src/bot-message-context.test-harness.js");
-
 function createSlackAccount(config: ResolvedSlackAccount["config"] = {}): ResolvedSlackAccount {
   return {
     accountId: "default",
@@ -113,45 +104,25 @@ describe("channel inbound contract", () => {
     dispatchInboundMessageMock.mockClear();
   });
 
-  it("keeps Discord inbound context finalized", () => {
-    const { groupSystemPrompt, ownerAllowFrom, untrustedContext } =
-      buildDiscordInboundAccessContext({
-        channelConfig: null,
-        guildInfo: null,
-        sender: { id: "U1", name: "Alice", tag: "alice" },
-        isGuild: false,
-      });
-
-    const ctx = finalizeInboundContext({
-      Body: "hi",
-      BodyForAgent: "hi",
-      RawBody: "hi",
-      CommandBody: "hi",
-      From: "discord:U1",
-      To: "user:U1",
-      SessionKey: "agent:main:discord:direct:u1",
-      AccountId: "default",
-      ChatType: "direct",
-      ConversationLabel: "Alice",
-      SenderName: "Alice",
-      SenderId: "U1",
-      SenderUsername: "alice",
-      GroupSystemPrompt: groupSystemPrompt,
-      OwnerAllowFrom: ownerAllowFrom,
-      UntrustedContext: untrustedContext,
-      Provider: "discord",
-      Surface: "discord",
-      WasMentioned: false,
-      MessageSid: "m1",
-      CommandAuthorized: true,
-      OriginatingChannel: "discord",
-      OriginatingTo: "user:U1",
+  it("keeps Discord inbound context finalized", async () => {
+    const { processDiscordMessage } =
+      await import("../../../../extensions/discord/src/monitor/message-handler.process.js");
+    const { createBaseDiscordMessageContext, createDiscordDirectMessageContextOverrides } =
+      await import("../../../../extensions/discord/src/monitor/message-handler.test-harness.js");
+    const messageCtx = await createBaseDiscordMessageContext({
+      cfg: { messages: {} },
+      ackReactionScope: "direct",
+      ...createDiscordDirectMessageContextOverrides(),
     });
 
-    expectChannelInboundContextContract(ctx);
+    await processDiscordMessage(messageCtx);
+
+    expect(inboundCtxCapture.ctx).toBeTruthy();
+    expectChannelInboundContextContract(inboundCtxCapture.ctx!);
   });
 
   it("keeps Signal inbound context finalized", async () => {
+    const { finalizeInboundContext } = await import("../../../auto-reply/reply/inbound-context.js");
     const ctx = finalizeInboundContext({
       Body: "Alice: hi",
       BodyForAgent: "hi",
@@ -179,6 +150,10 @@ describe("channel inbound contract", () => {
   });
 
   it("keeps Slack inbound context finalized", async () => {
+    const { prepareSlackMessage } =
+      await import("../../../../extensions/slack/src/monitor/message-handler/prepare.js");
+    const { createInboundSlackTestContext } =
+      await import("../../../../extensions/slack/src/monitor/message-handler/prepare.test-helpers.js");
     await withTempHome(async () => {
       const ctx = createInboundSlackTestContext({
         cfg: {
@@ -201,6 +176,8 @@ describe("channel inbound contract", () => {
   });
 
   it("keeps Telegram inbound context finalized", async () => {
+    const { buildTelegramMessageContextForTest } =
+      await import("../../../../extensions/telegram/src/bot-message-context.test-harness.js");
     const context = await buildTelegramMessageContextForTest({
       cfg: {
         agents: {
@@ -235,6 +212,7 @@ describe("channel inbound contract", () => {
   });
 
   it("keeps WhatsApp inbound context finalized", async () => {
+    const { finalizeInboundContext } = await import("../../../auto-reply/reply/inbound-context.js");
     const ctx = finalizeInboundContext({
       Body: "Alice: hi",
       BodyForAgent: "hi",
