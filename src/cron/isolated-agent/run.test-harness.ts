@@ -46,6 +46,7 @@ export const pickLastNonEmptyTextFromPayloadsMock = createMock();
 export const resolveCronPayloadOutcomeMock = createMock();
 export const resolveCronDeliveryPlanMock = createMock();
 export const resolveDeliveryTargetMock = createMock();
+export const deliverOutboundPayloadsMock = createMock();
 
 vi.mock("../../agents/agent-scope.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../agents/agent-scope.js")>();
@@ -241,7 +242,7 @@ vi.mock("../../infra/outbound/deliver.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../infra/outbound/deliver.js")>();
   return {
     ...actual,
-    deliverOutboundPayloads: vi.fn().mockResolvedValue(undefined),
+    deliverOutboundPayloads: deliverOutboundPayloadsMock,
   };
 });
 
@@ -306,7 +307,7 @@ vi.mock("../../agents/defaults.js", async (importOriginal) => {
 
 export function makeCronSessionEntry(overrides?: Record<string, unknown>): CronSessionEntry {
   return {
-    sessionId: "test-session-id",
+    sessionId: `test-session-id-${Math.random().toString(36).slice(2)}`,
     updatedAt: 0,
     systemSent: false,
     skillsSnapshot: undefined,
@@ -418,6 +419,9 @@ export function resetRunCronIsolatedAgentTurnHarness(): void {
     accountId: undefined,
     error: undefined,
   });
+
+  deliverOutboundPayloadsMock.mockReset();
+  deliverOutboundPayloadsMock.mockResolvedValue([]);
 
   logWarnMock.mockReset();
 }
