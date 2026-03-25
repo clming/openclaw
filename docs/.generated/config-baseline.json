@@ -24443,6 +24443,20 @@
       "hasChildren": false
     },
     {
+      "path": "channels.msteams.authType",
+      "kind": "channel",
+      "type": "string",
+      "required": false,
+      "enumValues": [
+        "secret",
+        "federated"
+      ],
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
       "path": "channels.msteams.blockStreamingCoalesce",
       "kind": "channel",
       "type": "object",
@@ -24494,6 +24508,26 @@
     },
     {
       "path": "channels.msteams.capabilities.*",
+      "kind": "channel",
+      "type": "string",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
+      "path": "channels.msteams.certificatePath",
+      "kind": "channel",
+      "type": "string",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
+      "path": "channels.msteams.certificateThumbprint",
       "kind": "channel",
       "type": "string",
       "required": false,
@@ -24718,6 +24752,16 @@
       "path": "channels.msteams.historyLimit",
       "kind": "channel",
       "type": "integer",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
+      "path": "channels.msteams.managedIdentityClientId",
+      "kind": "channel",
+      "type": "string",
       "required": false,
       "deprecated": false,
       "sensitive": false,
@@ -25245,6 +25289,16 @@
       "path": "channels.msteams.textChunkLimit",
       "kind": "channel",
       "type": "integer",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
+      "path": "channels.msteams.useManagedIdentity",
+      "kind": "channel",
+      "type": "boolean",
       "required": false,
       "deprecated": false,
       "sensitive": false,
