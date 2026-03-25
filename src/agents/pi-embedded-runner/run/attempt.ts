@@ -1721,16 +1721,20 @@ export async function runEmbeddedAttempt(
     });
 
     const sessionLabel = params.sessionKey ?? params.sessionId;
-    const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles } =
-      await resolveBootstrapContextForRun({
-        workspaceDir: effectiveWorkspace,
-        config: params.config,
-        sessionKey: params.sessionKey,
-        sessionId: params.sessionId,
-        warn: makeBootstrapWarn({ sessionLabel, warn: (message) => log.warn(message) }),
-        contextMode: params.bootstrapContextMode,
-        runKind: params.bootstrapContextRunKind,
-      });
+    // Parallelize bootstrap context resolution and machine name lookup for better performance
+    const [{ bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles }, machineName] =
+      await Promise.all([
+        resolveBootstrapContextForRun({
+          workspaceDir: effectiveWorkspace,
+          config: params.config,
+          sessionKey: params.sessionKey,
+          sessionId: params.sessionId,
+          warn: makeBootstrapWarn({ sessionLabel, warn: (message) => log.warn(message) }),
+          contextMode: params.bootstrapContextMode,
+          runKind: params.bootstrapContextRunKind,
+        }),
+        getMachineDisplayName(),
+      ]);
     const bootstrapMaxChars = resolveBootstrapMaxChars(params.config);
     const bootstrapTotalMaxChars = resolveBootstrapTotalMaxChars(params.config);
     const bootstrapAnalysis = analyzeBootstrapBudget({
@@ -1870,7 +1874,6 @@ export async function runEmbeddedAttempt(
     });
     logToolSchemasForGoogle({ tools: effectiveTools, provider: params.provider });
 
-    const machineName = await getMachineDisplayName();
     const runtimeChannel = normalizeMessageChannel(params.messageChannel ?? params.messageProvider);
     let runtimeCapabilities = runtimeChannel
       ? (resolveChannelCapabilities({
