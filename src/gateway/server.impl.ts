@@ -511,9 +511,7 @@ export async function startGatewayServer(
   if (diagnosticsEnabled) {
     startDiagnosticHeartbeat();
   }
-  let activeConfig = cfgAtStart;
   setGatewaySigusr1RestartPolicy({ allowExternal: isRestartEnabled(cfgAtStart) });
-  setPreRestartDeferralCheck(() => getGatewayRestartDeferralCounts(activeConfig).totalActive);
   // Unconditional startup migration: seed gateway.controlUi.allowedOrigins for existing
   // non-loopback installs that upgraded to v2026.2.26+ without required origins.
   cfgAtStart = await maybeSeedControlUiAllowedOriginsAtStartup({
@@ -521,6 +519,8 @@ export async function startGatewayServer(
     writeConfig: writeConfigFile,
     log,
   });
+  let activeConfig = cfgAtStart;
+  setPreRestartDeferralCheck(() => getGatewayRestartDeferralCounts(activeConfig).totalActive);
   await runStartupMatrixMigration({
     cfg: cfgAtStart,
     env: process.env,

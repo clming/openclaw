@@ -21,8 +21,9 @@ export function getGatewayRestartDeferralCounts(cfg: OpenClawConfig): GatewayRes
   const acpSnapshot = getAcpSessionManager().getObservabilitySnapshot(cfg);
   const acpActiveTurns = acpSnapshot.turns.active;
   const acpQueueDepth = acpSnapshot.turns.queueDepth;
-  // ACP queueDepth can already include the active turn, so use the higher watermark
-  // instead of double-counting active + queued work.
+  // ACP queueDepth always includes the currently active turn because the queue
+  // increments on enqueue and decrements only on settle. Use the higher
+  // watermark so active + queued work is not double-counted.
   const acpTurns = Math.max(acpActiveTurns, acpQueueDepth);
 
   return {
