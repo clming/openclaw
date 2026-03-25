@@ -163,6 +163,7 @@ describe("buildThreadingToolContext", () => {
       Provider: "slack",
       To: "channel:C1",
       MessageThreadId: "123.456",
+      MessageSid: "999.111",
     } as TemplateContext;
 
     const result = buildThreadingToolContext({
@@ -173,6 +174,7 @@ describe("buildThreadingToolContext", () => {
 
     expect(result.currentChannelId).toBe("C1");
     expect(result.currentThreadTs).toBe("123.456");
+    expect(result.currentMessageTs).toBe("999.111");
   });
 });
 
