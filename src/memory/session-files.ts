@@ -60,7 +60,9 @@ function normalizeSessionText(value: string): string {
 function stripRawContentMeta(raw: string, role: "user" | "assistant"): string {
   // Only strip inbound metadata for user messages — assistant responses may
   // legitimately quote or discuss metadata headers (e.g. troubleshooting output).
-  const afterMeta = role === "user" ? stripLeadingInboundMetadata(raw) : raw;
+  // Fast-path: skip stripLeadingInboundMetadata entirely when no '<' is present —
+  // inbound metadata blocks are XML-like tags so they always contain '<'.
+  const afterMeta = role === "user" && raw.includes("<") ? stripLeadingInboundMetadata(raw) : raw;
   if (!afterMeta.includes("[[")) {
     return afterMeta;
   }
