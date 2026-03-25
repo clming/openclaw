@@ -1,9 +1,9 @@
 import { Type } from "@sinclair/typebox";
 import {
   buildSearchCacheKey,
+  createScopedPluginWebSearchCredentialAccessors,
   DEFAULT_SEARCH_COUNT,
   enablePluginInConfig,
-  getScopedCredentialValue,
   mergeScopedSearchConfig,
   parseIsoDateRange,
   readCachedSearchPayload,
@@ -15,8 +15,6 @@ import {
   resolveSearchCacheTtlMs,
   resolveSearchTimeoutSeconds,
   resolveSiteName,
-  setProviderWebSearchPluginConfigValue,
-  setScopedCredentialValue,
   type SearchConfigRecord,
   type WebSearchProviderPlugin,
   type WebSearchProviderToolDefinition,
@@ -598,16 +596,7 @@ export function createExaWebSearchProvider(): WebSearchProviderPlugin {
     signupUrl: "https://exa.ai/",
     docsUrl: "https://docs.openclaw.ai/tools/web",
     autoDetectOrder: 65,
-    credentialPath: "plugins.entries.exa.config.webSearch.apiKey",
-    inactiveSecretPaths: ["plugins.entries.exa.config.webSearch.apiKey"],
-    getCredentialValue: (searchConfig) => getScopedCredentialValue(searchConfig, "exa"),
-    setCredentialValue: (searchConfigTarget, value) =>
-      setScopedCredentialValue(searchConfigTarget, "exa", value),
-    getConfiguredCredentialValue: (config) =>
-      resolveProviderWebSearchPluginConfig(config, "exa")?.apiKey,
-    setConfiguredCredentialValue: (configTarget, value) => {
-      setProviderWebSearchPluginConfigValue(configTarget, "exa", "apiKey", value);
-    },
+    ...createScopedPluginWebSearchCredentialAccessors({ pluginId: "exa" }),
     applySelectionConfig: (config) => enablePluginInConfig(config, "exa").config,
     createTool: (ctx) =>
       createExaToolDefinition(
