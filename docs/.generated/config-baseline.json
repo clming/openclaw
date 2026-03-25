@@ -11446,6 +11446,16 @@
       "hasChildren": false
     },
     {
+      "path": "channels.discord.accounts.*.useComponentsV2",
+      "kind": "channel",
+      "type": "boolean",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
       "path": "channels.discord.accounts.*.voice",
       "kind": "channel",
       "type": "object",
@@ -14501,6 +14511,16 @@
       ],
       "label": "Discord Component Accent Color",
       "help": "Accent color for Discord component containers (hex). Set per account via channels.discord.accounts.<id>.ui.components.accentColor.",
+      "hasChildren": false
+    },
+    {
+      "path": "channels.discord.useComponentsV2",
+      "kind": "channel",
+      "type": "boolean",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
       "hasChildren": false
     },
     {

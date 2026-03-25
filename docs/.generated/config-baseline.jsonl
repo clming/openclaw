@@ -1016,6 +1016,7 @@
 {"recordType":"path","path":"channels.discord.accounts.*.ui","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.accounts.*.ui.components","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.accounts.*.ui.components.accentColor","kind":"channel","type":"string","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":false}
+{"recordType":"path","path":"channels.discord.accounts.*.useComponentsV2","kind":"channel","type":"boolean","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":false}
 {"recordType":"path","path":"channels.discord.accounts.*.voice","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.accounts.*.voice.autoJoin","kind":"channel","type":"array","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.accounts.*.voice.autoJoin.*","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
@@ -1283,6 +1284,7 @@
 {"recordType":"path","path":"channels.discord.ui","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.ui.components","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.ui.components.accentColor","kind":"channel","type":"string","required":false,"deprecated":false,"sensitive":false,"tags":["channels","network"],"label":"Discord Component Accent Color","help":"Accent color for Discord component containers (hex). Set per account via channels.discord.accounts.<id>.ui.components.accentColor.","hasChildren":false}
+{"recordType":"path","path":"channels.discord.useComponentsV2","kind":"channel","type":"boolean","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":false}
 {"recordType":"path","path":"channels.discord.voice","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}
 {"recordType":"path","path":"channels.discord.voice.autoJoin","kind":"channel","type":"array","required":false,"deprecated":false,"sensitive":false,"tags":["channels","network"],"label":"Discord Voice Auto-Join","help":"Voice channels to auto-join on startup (list of guildId/channelId entries).","hasChildren":true}
 {"recordType":"path","path":"channels.discord.voice.autoJoin.*","kind":"channel","type":"object","required":false,"deprecated":false,"sensitive":false,"tags":[],"hasChildren":true}

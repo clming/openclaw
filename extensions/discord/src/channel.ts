@@ -335,10 +335,25 @@ export const discordPlugin: ChannelPlugin<ResolvedDiscordAccount, DiscordProbe> 
         stripPatterns: () => ["<@!?\\d+>"],
       },
       agentPrompt: {
-        messageToolHints: () => [
-          "- Discord components: set `components` when sending messages to include buttons, selects, or v2 containers.",
-          "- Forms: add `components.modal` (title, fields). OpenClaw adds a trigger button and routes submissions as new messages.",
-        ],
+        messageToolHints: ({ cfg, accountId }) => {
+          const discordCfg = cfg?.channels?.discord as
+            | {
+                useComponentsV2?: boolean;
+                accounts?: Record<string, { useComponentsV2?: boolean }>;
+              }
+            | undefined;
+          const accountVal = accountId
+            ? discordCfg?.accounts?.[accountId]?.useComponentsV2
+            : undefined;
+          const useV2 = accountVal ?? discordCfg?.useComponentsV2 ?? true;
+          const componentHint = useV2
+            ? "- Discord components: set `components` when sending messages to include buttons, selects, or v2 containers."
+            : "- Discord components: set `components` when sending messages to include buttons or selects. Do not use v2 containers for message formatting.";
+          return [
+            componentHint,
+            "- Forms: add `components.modal` (title, fields). OpenClaw adds a trigger button and routes submissions as new messages.",
+          ];
+        },
       },
       messaging: {
         normalizeTarget: normalizeDiscordMessagingTarget,
