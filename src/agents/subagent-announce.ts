@@ -316,7 +316,10 @@ function countAssistantToolCalls(content: unknown): number {
   return count;
 }
 
-function summarizeSubagentOutputHistory(messages: Array<unknown>): SubagentOutputSnapshot {
+function summarizeSubagentOutputHistory(
+  messages: Array<unknown>,
+  options?: { safeRolesOnly?: boolean },
+): SubagentOutputSnapshot {
   const snapshot: SubagentOutputSnapshot = {
     assistantFragments: [],
     toolCallCount: 0,
@@ -341,6 +344,11 @@ function summarizeSubagentOutputHistory(messages: Array<unknown>): SubagentOutpu
       snapshot.latestSilentText = undefined;
       snapshot.latestAssistantText = text;
       snapshot.assistantFragments.push(text);
+      continue;
+    }
+    // Error outcomes can leave the original task prompt in null-role history entries when the
+    // child crashes before replying. Keep raw fallback limited to explicit tool output there.
+    if (options?.safeRolesOnly && role !== "toolResult" && role !== "tool") {
       continue;
     }
     const text = extractSubagentOutputText(message).trim();
@@ -400,7 +408,12 @@ async function readSubagentOutput(
     params: { sessionKey, limit: 100 },
   });
   const messages = Array.isArray(history?.messages) ? history.messages : [];
-  const selected = selectSubagentOutputText(summarizeSubagentOutputHistory(messages), outcome);
+  const selected = selectSubagentOutputText(
+    summarizeSubagentOutputHistory(messages, {
+      safeRolesOnly: outcome?.status === "error",
+    }),
+    outcome,
+  );
   if (selected?.trim()) {
     return selected;
   }
@@ -1509,7 +1522,7 @@ export async function runSubagentAnnounceFlow(params: {
         reply = await readSubagentOutput(params.childSessionKey, outcome);
       }
 
-      if (!reply?.trim()) {
+      if (!reply?.trim() && outcome.status !== "error") {
         reply = await readLatestSubagentOutputWithRetry({
           sessionKey: params.childSessionKey,
           maxWaitMs: params.timeoutMs,
