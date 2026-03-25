@@ -1081,11 +1081,16 @@ export async function executeJobCore(
           // e2362d35) and cron main-session responses are silently swallowed.
           // See: https://github.com/openclaw/openclaw/issues/28508
           heartbeat: { target: "last" },
+          // We are already inside the cron lane — skip the cron-in-progress
+          // check to avoid self-blocking.
+          fromCronLane: true,
         });
-        if (
-          heartbeatResult.status !== "skipped" ||
-          heartbeatResult.reason !== "requests-in-flight"
-        ) {
+        const isTransientBusy =
+          heartbeatResult.status === "skipped" &&
+          (heartbeatResult.reason === "requests-in-flight" ||
+            heartbeatResult.reason === "cron-in-progress" ||
+            heartbeatResult.reason === "lanes-busy");
+        if (!isTransientBusy) {
           break;
         }
         if (abortSignal?.aborted) {
