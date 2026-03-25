@@ -1149,7 +1149,10 @@ function tryParseMalformedToolCallArguments(raw: string): ToolCallArgumentRepair
     return undefined;
   }
   try {
-    JSON.parse(raw);
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { args: parsed as Record<string, unknown>, trailingSuffix: "" };
+    }
     return undefined;
   } catch {
     const jsonPrefix = extractBalancedJsonPrefix(raw);
@@ -1196,25 +1199,6 @@ function repairToolCallArgumentsInMessage(
     return;
   }
   typedBlock.arguments = repairedArgs;
-}
-
-function clearToolCallArgumentsInMessage(message: unknown, contentIndex: number): void {
-  if (!message || typeof message !== "object") {
-    return;
-  }
-  const content = (message as { content?: unknown }).content;
-  if (!Array.isArray(content)) {
-    return;
-  }
-  const block = content[contentIndex];
-  if (!block || typeof block !== "object") {
-    return;
-  }
-  const typedBlock = block as { type?: unknown; arguments?: unknown };
-  if (!isToolCallBlockType(typedBlock.type)) {
-    return;
-  }
-  typedBlock.arguments = {};
 }
 
 function repairMalformedToolCallArgumentsInMessage(
@@ -1291,16 +1275,22 @@ function wrapStreamRepairMalformedToolCallArguments(
                   repairedArgsByIndex.set(event.contentIndex, repair.args);
                   repairToolCallArgumentsInMessage(event.partial, event.contentIndex, repair.args);
                   repairToolCallArgumentsInMessage(event.message, event.contentIndex, repair.args);
-                  if (!loggedRepairIndices.has(event.contentIndex)) {
+                  if (
+                    repair.trailingSuffix.length > 0 &&
+                    !loggedRepairIndices.has(event.contentIndex)
+                  ) {
                     loggedRepairIndices.add(event.contentIndex);
                     log.warn(
                       `repairing Kimi tool call arguments after ${repair.trailingSuffix.length} trailing chars`,
                     );
                   }
                 } else {
+                  // Do not clear tool call arguments here. When tryParseMalformedToolCallArguments
+                  // returns undefined, the JSON may still be incomplete (streaming in progress) or
+                  // already set correctly via content_block_start.input. Clearing here would wipe
+                  // valid arguments that were never malformed. Let content_block_stop handle final
+                  // argument resolution via parseStreamingJson.
                   repairedArgsByIndex.delete(event.contentIndex);
-                  clearToolCallArgumentsInMessage(event.partial, event.contentIndex);
-                  clearToolCallArgumentsInMessage(event.message, event.contentIndex);
                 }
               }
             }
