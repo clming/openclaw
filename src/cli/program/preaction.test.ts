@@ -63,6 +63,15 @@ let originalNodeNoWarnings: string | undefined;
 let originalHideBanner: string | undefined;
 let originalForceStderr: boolean;
 
+function canReflectProcessTitleWrites(): boolean {
+  const original = process.title;
+  const probe = `${original}-probe`;
+  process.title = probe;
+  const didReflect = process.title === probe;
+  process.title = original;
+  return didReflect;
+}
+
 beforeAll(async () => {
   ({ registerPreActionHooks } = await import("./preaction.js"));
 });
@@ -214,7 +223,9 @@ describe("registerPreActionHooks", () => {
       commandPath: ["status"],
     });
     expect(ensurePluginRegistryLoadedMock).toHaveBeenCalledWith({ scope: "channels" });
-    expect(process.title).toBe("openclaw-status");
+    expect(process.title).toBe(
+      canReflectProcessTitleWrites() ? "openclaw-status" : originalProcessTitle,
+    );
 
     vi.clearAllMocks();
     await runPreAction({
