@@ -2457,6 +2457,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
                     },
                     additionalProperties: false,
                   },
+                  notifyUser: {
+                    type: "boolean",
+                  },
                 },
                 additionalProperties: false,
               },
