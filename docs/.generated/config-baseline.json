@@ -29542,6 +29542,16 @@
       "hasChildren": true
     },
     {
+      "path": "channels.slack.accounts.*.thread.autoReplyOnParticipation",
+      "kind": "channel",
+      "type": "boolean",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
+    },
+    {
       "path": "channels.slack.accounts.*.thread.historyScope",
       "kind": "channel",
       "type": "string",
@@ -30960,6 +30970,16 @@
       "sensitive": false,
       "tags": [],
       "hasChildren": true
+    },
+    {
+      "path": "channels.slack.thread.autoReplyOnParticipation",
+      "kind": "channel",
+      "type": "boolean",
+      "required": false,
+      "deprecated": false,
+      "sensitive": false,
+      "tags": [],
+      "hasChildren": false
     },
     {
       "path": "channels.slack.thread.historyScope",
