@@ -8599,6 +8599,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
               },
             },
           },
+          shellProfile: {
+            type: "string",
+          },
         },
         required: ["native", "nativeSkills", "restart", "ownerDisplay"],
         additionalProperties: false,
@@ -14250,6 +14253,11 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
       help: "Defines elevated command allow rules by channel and sender for owner-level command surfaces. Use narrow provider-specific identities so privileged commands are not exposed to broad chat audiences.",
       tags: ["access"],
     },
+    "commands.shellProfile": {
+      label: "Shell Profile Path",
+      help: "Path to a shell profile file to source before executing commands. When set and non-empty, PowerShell, bash, and other shells will load this profile (e.g., for custom environment variables, aliases, functions). Leave unset for default behavior without profile loading.",
+      tags: ["storage"],
+    },
     mcp: {
       label: "MCP",
       help: "Global MCP server definitions managed by OpenClaw. Embedded Pi and other runtime adapters can consume these servers without storing them inside Pi-owned project settings.",
@@ -16290,5 +16298,5 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
     },
   },
   version: "2026.3.24",
-  generatedAt: "2026-03-22T21:17:33.302Z",
+  generatedAt: "2026-03-24T21:17:33.302Z",
 } as const satisfies BaseConfigSchemaResponse;
