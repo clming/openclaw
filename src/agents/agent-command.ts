@@ -65,7 +65,7 @@ import { ensureAuthProfileStore } from "./auth-profiles.js";
 import { clearSessionAuthProfileOverride } from "./auth-profiles/session-override.js";
 import { resolveBootstrapWarningSignaturesSeen } from "./bootstrap-budget.js";
 import { runCliAgent } from "./cli-runner.js";
-import { getCliSessionId, setCliSessionId } from "./cli-session.js";
+import { clearAllCliSessionIds, getCliSessionId, setCliSessionId } from "./cli-session.js";
 import { deliverAgentCommandResult } from "./command/delivery.js";
 import { resolveAgentRunContext } from "./command/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./command/session-store.js";
@@ -103,7 +103,7 @@ type PersistSessionEntryParams = {
   entry: SessionEntry;
 };
 
-type OverrideFieldClearedByDelete =
+type SessionFieldClearedByDelete =
   | "providerOverride"
   | "modelOverride"
   | "authProfileOverride"
@@ -112,9 +112,12 @@ type OverrideFieldClearedByDelete =
   | "fallbackNoticeSelectedModel"
   | "fallbackNoticeActiveModel"
   | "fallbackNoticeReason"
+  | "systemPromptReport"
+  | "skillsSnapshot"
+  | "cliSessionIds"
   | "claudeCliSessionId";
 
-const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
+const SESSION_FIELDS_CLEARED_BY_DELETE: SessionFieldClearedByDelete[] = [
   "providerOverride",
   "modelOverride",
   "authProfileOverride",
@@ -123,6 +126,9 @@ const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
   "fallbackNoticeSelectedModel",
   "fallbackNoticeActiveModel",
   "fallbackNoticeReason",
+  "systemPromptReport",
+  "skillsSnapshot",
+  "cliSessionIds",
   "claudeCliSessionId",
 ];
 
@@ -159,8 +165,8 @@ function normalizeExplicitOverrideInput(raw: string, kind: "provider" | "model")
 async function persistSessionEntry(params: PersistSessionEntryParams): Promise<void> {
   const persisted = await updateSessionStore(params.storePath, (store) => {
     const merged = mergeSessionEntry(store[params.sessionKey], params.entry);
-    // Preserve explicit `delete` clears done by session override helpers.
-    for (const field of OVERRIDE_FIELDS_CLEARED_BY_DELETE) {
+    // Preserve explicit `delete` clears done by session rollover/override helpers.
+    for (const field of SESSION_FIELDS_CLEARED_BY_DELETE) {
       if (!Object.hasOwn(params.entry, field)) {
         Reflect.deleteProperty(merged, field);
       }
@@ -354,6 +360,7 @@ function runAgentAttempt(params: {
   modelOverride: string;
   cfg: ReturnType<typeof loadConfig>;
   sessionEntry: SessionEntry | undefined;
+  isNewSession: boolean;
   sessionId: string;
   sessionKey: string | undefined;
   sessionAgentId: string;
@@ -387,7 +394,10 @@ function runAgentAttempt(params: {
   const bootstrapPromptWarningSignature =
     bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1];
   if (isCliProvider(params.providerOverride, params.cfg)) {
-    const cliSessionId = getCliSessionId(params.sessionEntry, params.providerOverride);
+    // `/new` and `/reset` must not resume a stale backend CLI thread from the prior session.
+    const cliSessionId = params.isNewSession
+      ? undefined
+      : getCliSessionId(params.sessionEntry, params.providerOverride);
     const runCliWithSession = (nextCliSessionId: string | undefined) =>
       runCliAgent({
         sessionId: params.sessionId,
@@ -740,6 +750,30 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
 
   try {
+    if (isNewSession && sessionStore && sessionKey && sessionEntry) {
+      const next = { ...sessionEntry };
+      const clearedCliState = clearAllCliSessionIds(next);
+      const hadSystemPromptReport = Object.hasOwn(next, "systemPromptReport");
+      const hadSkillsSnapshot = Object.hasOwn(next, "skillsSnapshot");
+      if (hadSystemPromptReport) {
+        delete next.systemPromptReport;
+      }
+      if (hadSkillsSnapshot) {
+        delete next.skillsSnapshot;
+      }
+      if (clearedCliState || hadSystemPromptReport || hadSkillsSnapshot) {
+        next.sessionId = sessionId;
+        next.updatedAt = Date.now();
+        await persistSessionEntry({
+          sessionStore,
+          sessionKey,
+          storePath,
+          entry: next,
+        });
+        sessionEntry = next;
+      }
+    }
+
     if (opts.deliver === true) {
       const sendPolicy = resolveSendPolicy({
         cfg,
@@ -1185,6 +1219,7 @@ async function agentCommandInternal(
             modelOverride,
             cfg,
             sessionEntry,
+            isNewSession,
             sessionId,
             sessionKey,
             sessionAgentId,
