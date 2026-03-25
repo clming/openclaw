@@ -946,9 +946,20 @@ export async function handleFeishuMessage(params: {
     const configReplyInThread =
       isGroup &&
       (groupConfig?.replyInThread ?? feishuCfg?.replyInThread ?? "disabled") === "enabled";
+    const explicitReplyTargetMessageId =
+      ctx.parentId && ctx.parentId !== ctx.rootId ? ctx.parentId : undefined;
+    // In Feishu topic-scoped sessions we must anchor replies to the topic root.
+    // Following explicit quoted replies here can push the bot response out of the
+    // original topic, which breaks topic affinity for end users.
     const replyTargetMessageId =
-      isTopicSession || configReplyInThread ? (ctx.rootId ?? ctx.messageId) : ctx.messageId;
+      isTopicSession || configReplyInThread
+        ? (ctx.rootId ?? ctx.messageId)
+        : (explicitReplyTargetMessageId ?? ctx.messageId);
     const threadReply = isGroup ? (groupSession?.threadReply ?? false) : false;
+    const effectiveReplyInThread =
+      isTopicSession || configReplyInThread || explicitReplyTargetMessageId == null
+        ? replyInThread
+        : false;
 
     if (broadcastAgents) {
       // Cross-account dedup: in multi-account setups, Feishu delivers the same
@@ -1002,7 +1013,7 @@ export async function handleFeishuMessage(params: {
             chatId: ctx.chatId,
             replyToMessageId: replyTargetMessageId,
             skipReplyToInMessages: !isGroup,
-            replyInThread,
+            replyInThread: effectiveReplyInThread,
             rootId: ctx.rootId,
             threadReply,
             mentionTargets: ctx.mentionTargets,
@@ -1103,7 +1114,7 @@ export async function handleFeishuMessage(params: {
         chatId: ctx.chatId,
         replyToMessageId: replyTargetMessageId,
         skipReplyToInMessages: !isGroup,
-        replyInThread,
+        replyInThread: effectiveReplyInThread,
         rootId: ctx.rootId,
         threadReply,
         mentionTargets: ctx.mentionTargets,
