@@ -36,6 +36,7 @@ import type {
   OpenClawPluginHttpRouteHandler,
   OpenClawPluginHttpRouteParams,
   OpenClawPluginHookOptions,
+  OpenClawPluginTypedHookOptions,
   MediaUnderstandingProviderPlugin,
   ProviderPlugin,
   OpenClawPluginService,
@@ -777,7 +778,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     record: PluginRecord,
     hookName: K,
     handler: PluginHookHandlerMap[K],
-    opts?: { priority?: number },
+    opts?: OpenClawPluginTypedHookOptions<K>,
     policy?: PluginTypedHookPolicy,
   ) => {
     if (!isPluginHookName(hookName)) {
@@ -812,6 +813,21 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
         ) as PluginHookHandlerMap[K];
       }
     }
+    let messageReceivedMode: "observe" | "blocking" | undefined;
+    if (hookName === "message_received" && opts && "mode" in opts) {
+      const raw = (opts as { mode?: string }).mode;
+      if (raw !== undefined && raw !== "observe" && raw !== "blocking") {
+        pushDiagnostic({
+          level: "warn",
+          pluginId: record.id,
+          source: record.source,
+          message: `message_received hook registered with unknown mode "${raw}", falling back to observer`,
+        });
+      } else {
+        messageReceivedMode = raw;
+      }
+    }
+
     record.hookCount += 1;
     registry.typedHooks.push({
       pluginId: record.id,
@@ -819,6 +835,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       handler: effectiveHandler,
       priority: opts?.priority,
       source: record.source,
+      messageReceivedMode,
     } as TypedPluginHookRegistration);
   };
 
