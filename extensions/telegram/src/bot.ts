@@ -91,8 +91,6 @@ export function setTelegramBotRuntimeForTest(runtime?: TelegramBotRuntime): void
 
 type TelegramFetchInput = Parameters<NonNullable<ApiClientOptions["fetch"]>>[0];
 type TelegramFetchInit = Parameters<NonNullable<ApiClientOptions["fetch"]>>[1];
-type GlobalFetchInput = Parameters<typeof globalThis.fetch>[0];
-type GlobalFetchInit = Parameters<typeof globalThis.fetch>[1];
 
 function readRequestUrl(input: TelegramFetchInput): string | null {
   if (typeof input === "string") {
@@ -167,8 +165,6 @@ export function createTelegramBot(opts: TelegramBotOptions) {
     ApiClientOptions["fetch"]
   >;
 
-  // Wrap fetch so polling requests cannot hang indefinitely on a wedged network path,
-  // and so shutdown still aborts in-flight Telegram API requests immediately.
   let finalFetch = shouldProvideFetch ? fetchForClient : undefined;
   if (finalFetch || opts.fetchAbortSignal) {
     const baseFetch =
@@ -176,23 +172,24 @@ export function createTelegramBot(opts: TelegramBotOptions) {
     // Cast baseFetch to global fetch to avoid node-fetch ↔ global-fetch type divergence;
     // they are runtime-compatible (the codebase already casts at every fetch boundary).
     const callFetch = baseFetch as unknown as typeof globalThis.fetch;
-    // Use manual event forwarding instead of AbortSignal.any() to avoid the cross-realm
-    // AbortSignal issue in Node.js (grammY's signal may come from a different module context,
-    // causing "signals[0] must be an instance of AbortSignal" errors).
+    // 仅让 getUpdates 绑定轮询重启/关闭信号；发送类请求沿用自身信号，避免轮询重启时被误中断。
     finalFetch = ((input: TelegramFetchInput, init?: TelegramFetchInit) => {
       const controller = new AbortController();
       const abortWith = (signal: AbortSignal) => controller.abort(signal.reason);
       const shutdownSignal = opts.fetchAbortSignal;
       const onShutdown = () => abortWith(shutdownSignal as AbortSignal);
       const method = extractTelegramApiMethod(input);
+      const shouldAbortOnShutdown = method === "getupdates";
       const requestTimeoutMs =
         method === "getupdates" ? TELEGRAM_GET_UPDATES_REQUEST_TIMEOUT_MS : undefined;
       let requestTimeout: ReturnType<typeof setTimeout> | undefined;
       let onRequestAbort: (() => void) | undefined;
-      if (shutdownSignal?.aborted) {
-        abortWith(shutdownSignal);
-      } else if (shutdownSignal) {
-        shutdownSignal.addEventListener("abort", onShutdown, { once: true });
+      if (shouldAbortOnShutdown) {
+        if (shutdownSignal?.aborted) {
+          abortWith(shutdownSignal);
+        } else if (shutdownSignal) {
+          shutdownSignal.addEventListener("abort", onShutdown, { once: true });
+        }
       }
       if (init?.signal) {
         if (init.signal.aborted) {
@@ -215,7 +212,9 @@ export function createTelegramBot(opts: TelegramBotOptions) {
         if (requestTimeout) {
           clearTimeout(requestTimeout);
         }
-        shutdownSignal?.removeEventListener("abort", onShutdown);
+        if (shouldAbortOnShutdown) {
+          shutdownSignal?.removeEventListener("abort", onShutdown);
+        }
         if (init?.signal && onRequestAbort) {
           init.signal.removeEventListener("abort", onRequestAbort);
         }

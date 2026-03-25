@@ -30,7 +30,7 @@ function createWrappedTelegramClientFetch(proxyFetch: typeof fetch) {
 }
 
 describe("createTelegramBot fetch abort", () => {
-  it("aborts wrapped client fetch when fetchAbortSignal aborts", async () => {
+  it("aborts wrapped getUpdates fetch when fetchAbortSignal aborts", async () => {
     const fetchSpy = vi.fn(
       (_input: RequestInfo | URL, init?: RequestInit) =>
         new Promise<AbortSignal>((resolve) => {
@@ -42,12 +42,28 @@ describe("createTelegramBot fetch abort", () => {
       fetchSpy as unknown as typeof fetch,
     );
 
-    const observedSignalPromise = clientFetch("https://example.test");
+    const observedSignalPromise = clientFetch("https://api.telegram.org/bot123456:ABC/getUpdates");
     shutdown.abort(new Error("shutdown"));
     const observedSignal = (await observedSignalPromise) as AbortSignal;
 
     expect(observedSignal).toBeInstanceOf(AbortSignal);
     expect(observedSignal.aborted).toBe(true);
+  });
+
+  it("does not abort wrapped non-polling fetches when fetchAbortSignal aborts", async () => {
+    const fetchSpy = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => init?.signal as AbortSignal,
+    );
+    const { clientFetch, shutdown } = createWrappedTelegramClientFetch(
+      fetchSpy as unknown as typeof fetch,
+    );
+
+    const observedSignalPromise = clientFetch("https://api.telegram.org/bot123456:ABC/sendMessage");
+    shutdown.abort(new Error("shutdown"));
+    const observedSignal = (await observedSignalPromise) as AbortSignal;
+
+    expect(observedSignal).toBeInstanceOf(AbortSignal);
+    expect(observedSignal.aborted).toBe(false);
   });
 
   it("tags wrapped Telegram fetch failures with the Bot API method", async () => {
