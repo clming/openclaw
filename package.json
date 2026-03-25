@@ -604,6 +604,7 @@
     "check:host-env-policy:swift": "node scripts/generate-host-env-security-policy-swift.mjs --check",
     "check:loc": "node --import tsx scripts/check-ts-max-loc.ts --max 500",
     "check:no-conflict-markers": "node scripts/check-no-conflict-markers.mjs",
+    "clean:dist": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
     "config:docs:check": "node --import tsx scripts/generate-config-doc-baseline.ts --check",
     "config:docs:gen": "node --import tsx scripts/generate-config-doc-baseline.ts --write",
     "config:schema:check": "node --import tsx scripts/generate-base-config-schema.ts --check",
