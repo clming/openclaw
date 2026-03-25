@@ -869,12 +869,24 @@ describe("gateway server chat", () => {
 
         await expect(errorPromise).rejects.toThrow("timeout");
         const finalEvent = await finalPromise;
-        expect(finalEvent.payload).toMatchObject({
+        const finalPayload = finalEvent.payload as
+          | {
+              runId?: string;
+              sessionKey?: string;
+              state?: string;
+              message?: {
+                content?: Array<{
+                  text?: string;
+                }>;
+              };
+            }
+          | undefined;
+        expect(finalPayload).toMatchObject({
           runId,
           sessionKey: "main",
           state: "final",
         });
-        expect(finalEvent.payload?.message?.content?.[0]?.text).toBe("Recovered reply");
+        expect(finalPayload?.message?.content?.[0]?.text).toBe("Recovered reply");
 
         await abortChatRun(runId);
       } finally {
