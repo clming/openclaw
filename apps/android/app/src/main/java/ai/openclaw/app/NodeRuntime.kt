@@ -193,13 +193,13 @@ class NodeRuntime(
   private val _pendingGatewayTrust = MutableStateFlow<GatewayTrustPrompt?>(null)
   val pendingGatewayTrust: StateFlow<GatewayTrustPrompt?> = _pendingGatewayTrust.asStateFlow()
 
-  private fun generateNodeSessionKey(): String {
+  private fun generateNodeSessionKey(agentId: String = "main"): String {
     val deviceId = identityStore.loadOrCreate().deviceId
     val shortDeviceId = deviceId.take(12)
-    return "agent:main:node-$shortDeviceId"
+    return "agent:$agentId:node-$shortDeviceId"
   }
 
-  private val _mainSessionKey = MutableStateFlow(generateNodeSessionKey())
+  private val _mainSessionKey = MutableStateFlow("main")
   val mainSessionKey: StateFlow<String> = _mainSessionKey.asStateFlow()
 
   private val cameraHudSeq = AtomicLong(0)
@@ -247,7 +247,15 @@ class NodeRuntime(
         _serverName.value = name
         _remoteAddress.value = remote
         _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
-        applyMainSessionKey(mainSessionKey)
+        
+        val resolvedKey = if (isCanonicalMainSessionKey(mainSessionKey)) {
+          mainSessionKey
+        } else {
+          val agentId = gatewayDefaultAgentId?.ifEmpty { "main" } ?: "main"
+          generateNodeSessionKey(agentId)
+        }
+        applyMainSessionKey(resolvedKey)
+        
         updateStatus()
         micCapture.onGatewayConnectionChanged(true)
         scope.launch {
@@ -968,7 +976,14 @@ class NodeRuntime(
       val raw = ui?.get("seamColor").asStringOrNull()?.trim()
       val sessionCfg = config?.get("session").asObjectOrNull()
       val mainKey = normalizeMainKey(sessionCfg?.get("mainKey").asStringOrNull())
-      applyMainSessionKey(mainKey)
+      
+      val resolvedKey = if (isCanonicalMainSessionKey(mainKey)) {
+        mainKey
+      } else {
+        val agentId = gatewayDefaultAgentId?.ifEmpty { "main" } ?: "main"
+        generateNodeSessionKey(agentId)
+      }
+      applyMainSessionKey(resolvedKey)
 
       val parsed = parseHexColorArgb(raw)
       _seamColorArgb.value = parsed ?: DEFAULT_SEAM_COLOR_ARGB
@@ -1001,7 +1016,14 @@ class NodeRuntime(
 
       gatewayDefaultAgentId = defaultAgentId.ifEmpty { null }
       gatewayAgents = agents
-      applyMainSessionKey(mainKey)
+      
+      val resolvedKey = if (isCanonicalMainSessionKey(mainKey)) {
+        mainKey
+      } else {
+        val agentId = defaultAgentId.ifEmpty { "main" }
+        generateNodeSessionKey(agentId)
+      }
+      applyMainSessionKey(resolvedKey)
       updateHomeCanvasState()
     } catch (_: Throwable) {
       // ignore
