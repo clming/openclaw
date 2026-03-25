@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AnyAgentTool } from "./tools/common.js";
 
 const { resolvePluginToolsMock } = vi.hoisted(() => ({
-  resolvePluginToolsMock: vi.fn((params?: unknown) => {
+  resolvePluginToolsMock: vi.fn<(params?: unknown) => AnyAgentTool[]>((params?: unknown) => {
     void params;
     return [];
   }),
@@ -78,5 +79,209 @@ describe("createOpenClawTools plugin context", () => {
         allowGatewaySubagentBinding: true,
       }),
     );
+  });
+
+  it("injects messageThreadId from agentThreadId when tool schema supports messageThreadId", async () => {
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-test",
+      label: "plugin-message-thread-test",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "number" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: 77,
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    expect(tool).toBe(threadTool);
+    await tool.execute("call1", {});
+    expect(executeMock).toHaveBeenCalledWith("call1", { messageThreadId: 77 });
+  });
+
+  it("does not override explicit params.messageThreadId provided by the caller", async () => {
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-test-override",
+      label: "plugin-message-thread-test-override",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "number" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: 77,
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    expect(tool).toBe(threadTool);
+    await tool.execute("call1", { messageThreadId: 5 });
+    expect(executeMock).toHaveBeenCalledWith("call1", { messageThreadId: 5 });
+  });
+
+  it("does not override explicit params.message_thread_id provided by the caller", async () => {
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-test-snake-override",
+      label: "plugin-message-thread-test-snake-override",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "number" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: 77,
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    expect(tool).toBe(threadTool);
+    await tool.execute("call1", { message_thread_id: 5 });
+    expect(executeMock).toHaveBeenCalledWith("call1", { message_thread_id: 5 });
+  });
+
+  it("preserves large integer string agentThreadId as string (snowflake-safe injection)", async () => {
+    const snowflake = "1177378744822943744";
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-snowflake",
+      label: "plugin-message-thread-snowflake",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "string" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: snowflake,
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    await tool.execute("call1", {});
+    expect(executeMock).toHaveBeenCalledWith("call1", { messageThreadId: snowflake });
+  });
+
+  it("coerces small numeric string agentThreadId into a number before injecting messageThreadId", async () => {
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-test-string",
+      label: "plugin-message-thread-test-string",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "number" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: "77",
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    expect(tool).toBe(threadTool);
+    await tool.execute("call1", {});
+    expect(executeMock).toHaveBeenCalledWith("call1", { messageThreadId: 77 });
+  });
+
+  it("preserves decimal-like string agentThreadId as string for exact thread tokens", async () => {
+    const slackTs = "1719341020.000200";
+    const executeMock = vi.fn(async () => ({
+      content: [{ type: "text" as const, text: "ok" }],
+      details: {},
+    }));
+    const threadTool: AnyAgentTool = {
+      name: "plugin-message-thread-decimal-string",
+      label: "plugin-message-thread-decimal-string",
+      description: "test",
+      ownerOnly: false,
+      parameters: {
+        type: "object",
+        properties: { messageThreadId: { type: "string" } },
+      },
+      execute: executeMock,
+    };
+
+    resolvePluginToolsMock.mockReturnValue([threadTool]);
+
+    const tools = createOpenClawTools({
+      config: {} as never,
+      agentThreadId: slackTs,
+    });
+    const tool = tools.find((candidate) => candidate.name === threadTool.name);
+    expect(tool).toBeDefined();
+    if (!tool) {
+      return;
+    }
+
+    await tool.execute("call1", {});
+    expect(executeMock).toHaveBeenCalledWith("call1", { messageThreadId: slackTs });
   });
 });

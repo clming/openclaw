@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../config/config.js";
 import { callGateway } from "../gateway/call.js";
+import { readSnakeCaseParamRaw } from "../param-key.js";
 import { resolvePluginTools } from "../plugins/tools.js";
 import { getActiveRuntimeWebToolsMetadata } from "../secrets/runtime.js";
 import type { GatewayMessageChannel } from "../utils/message-channel.js";
@@ -39,6 +40,59 @@ const defaultOpenClawToolsDeps: OpenClawToolsDeps = {
 };
 
 let openClawToolsDeps: OpenClawToolsDeps = defaultOpenClawToolsDeps;
+
+/**
+ * Value to inject into plugin tools that declare `messageThreadId` in their schema.
+ * Integer strings outside IEEE-754 safe integer range stay as strings so IDs like
+ * Discord snowflakes are not rounded by `Number(...)`.
+ */
+function normalizeMessageThreadIdForInjection(value: unknown): string | number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  // Pure integer strings: avoid Number() precision loss for large IDs (e.g. snowflakes).
+  if (/^-?\d+$/.test(trimmed)) {
+    try {
+      const asBigInt = BigInt(trimmed);
+      const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+      const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
+      if (asBigInt > maxSafe || asBigInt < minSafe) {
+        return trimmed;
+      }
+      return Number(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  // Non-integer IDs can be exact string tokens (e.g. Slack ts values). Preserve
+  // lexical identity instead of coercing through Number(...) and losing fidelity.
+  return trimmed;
+}
+
+function toolParametersSupportsMessageThreadId(tool: AnyAgentTool): boolean {
+  const schema =
+    tool.parameters && typeof tool.parameters === "object"
+      ? (tool.parameters as Record<string, unknown>)
+      : null;
+  if (!schema) {
+    return false;
+  }
+  const properties =
+    schema.properties && typeof schema.properties === "object"
+      ? (schema.properties as Record<string, unknown>)
+      : null;
+  return Boolean(properties && "messageThreadId" in properties);
+}
 
 export function createOpenClawTools(
   options?: {
@@ -266,7 +320,37 @@ export function createOpenClawTools(
     allowGatewaySubagentBinding: options?.allowGatewaySubagentBinding,
   });
 
-  return [...tools, ...pluginTools];
+  const normalizedMessageThreadId = normalizeMessageThreadIdForInjection(options?.agentThreadId);
+  if (normalizedMessageThreadId === undefined) {
+    return [...tools, ...pluginTools];
+  }
+
+  const wrappedPluginTools = pluginTools.map((tool) => {
+    if (!tool.execute || !toolParametersSupportsMessageThreadId(tool)) {
+      return tool;
+    }
+    const originalExecute = tool.execute.bind(tool);
+    tool.execute = async (...args: unknown[]) => {
+      const params = args[1];
+      const paramsRecord =
+        params && typeof params === "object" && !Array.isArray(params)
+          ? (params as Record<string, unknown>)
+          : null;
+      if (!paramsRecord) {
+        return await originalExecute(...(args as Parameters<typeof originalExecute>));
+      }
+      if (readSnakeCaseParamRaw(paramsRecord, "messageThreadId") !== undefined) {
+        return await originalExecute(...(args as Parameters<typeof originalExecute>));
+      }
+      const nextParams = { ...paramsRecord, messageThreadId: normalizedMessageThreadId };
+      const nextArgs = [...args];
+      nextArgs[1] = nextParams;
+      return await originalExecute(...(nextArgs as Parameters<typeof originalExecute>));
+    };
+    return tool;
+  });
+
+  return [...tools, ...wrappedPluginTools];
 }
 
 export const __testing = {
