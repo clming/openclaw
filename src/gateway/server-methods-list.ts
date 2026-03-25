@@ -50,6 +50,7 @@ const BASE_METHODS = [
   "skills.bins",
   "skills.install",
   "skills.update",
+  "hive.sync",
   "update.run",
   "voicewake.get",
   "voicewake.set",

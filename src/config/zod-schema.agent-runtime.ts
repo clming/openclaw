@@ -732,6 +732,13 @@ export const MemorySearchSchema = z
   })
   .strict()
   .optional();
+
+export const ResearchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .strict()
+  .optional();
 export { AgentModelSchema };
 
 const AgentRuntimeAcpSchema = z
@@ -812,7 +819,7 @@ export const ToolsSchema = z
     links: ToolsLinksSchema,
     sessions: z
       .object({
-        visibility: z.enum(["self", "tree", "agent", "all"]).optional(),
+        visibility: z.enum(["self", "tree", "agent", "all", "consortium"]).optional(),
       })
       .strict()
       .optional(),

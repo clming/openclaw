@@ -200,6 +200,10 @@ import {
   SessionsDeleteParamsSchema,
   type SessionsListParams,
   SessionsListParamsSchema,
+  type SessionsSearchParams,
+  type SessionsRecallParams,
+  SessionsSearchParamsSchema,
+  SessionsRecallParamsSchema,
   type SessionsMessagesSubscribeParams,
   SessionsMessagesSubscribeParamsSchema,
   type SessionsMessagesUnsubscribeParams,
@@ -221,6 +225,8 @@ import {
   type SkillsBinsParams,
   SkillsBinsParamsSchema,
   type SkillsBinsResult,
+  type HiveSyncParams,
+  HiveSyncParamsSchema,
   type SkillsInstallParams,
   SkillsInstallParamsSchema,
   type SkillsStatusParams,
@@ -335,6 +341,12 @@ export const validateSecretsResolveResult = ajv.compile<SecretsResolveResult>(
   SecretsResolveResultSchema,
 );
 export const validateSessionsListParams = ajv.compile<SessionsListParams>(SessionsListParamsSchema);
+export const validateSessionsSearchParams = ajv.compile<SessionsSearchParams>(
+  SessionsSearchParamsSchema,
+);
+export const validateSessionsRecallParams = ajv.compile<SessionsRecallParams>(
+  SessionsRecallParamsSchema,
+);
 export const validateSessionsPreviewParams = ajv.compile<SessionsPreviewParams>(
   SessionsPreviewParamsSchema,
 );
@@ -400,6 +412,7 @@ export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBins
 export const validateSkillsInstallParams =
   ajv.compile<SkillsInstallParams>(SkillsInstallParamsSchema);
 export const validateSkillsUpdateParams = ajv.compile<SkillsUpdateParams>(SkillsUpdateParamsSchema);
+export const validateHiveSyncParams = ajv.compile<HiveSyncParams>(HiveSyncParamsSchema);
 export const validateCronListParams = ajv.compile<CronListParams>(CronListParamsSchema);
 export const validateCronStatusParams = ajv.compile<CronStatusParams>(CronStatusParamsSchema);
 export const validateCronAddParams = ajv.compile<CronAddParams>(CronAddParamsSchema);
@@ -524,6 +537,8 @@ export {
   NodePendingEnqueueParamsSchema,
   NodePendingEnqueueResultSchema,
   SessionsListParamsSchema,
+  SessionsSearchParamsSchema,
+  SessionsRecallParamsSchema,
   SessionsPreviewParamsSchema,
   SessionsResolveParamsSchema,
   SessionsCreateParamsSchema,
@@ -581,6 +596,7 @@ export {
   ToolsEffectiveParamsSchema,
   SkillsInstallParamsSchema,
   SkillsUpdateParamsSchema,
+  HiveSyncParamsSchema,
   CronJobSchema,
   CronListParamsSchema,
   CronStatusParamsSchema,
@@ -677,6 +693,7 @@ export type {
   SkillsBinsResult,
   SkillsInstallParams,
   SkillsUpdateParams,
+  HiveSyncParams,
   NodePairRejectParams,
   NodePairVerifyParams,
   NodeListParams,
@@ -688,6 +705,8 @@ export type {
   NodePendingEnqueueParams,
   NodePendingEnqueueResult,
   SessionsListParams,
+  SessionsSearchParams,
+  SessionsRecallParams,
   SessionsPreviewParams,
   SessionsResolveParams,
   SessionsPatchParams,

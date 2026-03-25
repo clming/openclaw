@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { parseByteSize } from "../cli/parse-bytes.js";
 import { parseDurationMs } from "../cli/parse-duration.js";
-import { ToolsSchema } from "./zod-schema.agent-runtime.js";
+import { ResearchSchema, ToolsSchema } from "./zod-schema.agent-runtime.js";
 import { AgentsSchema, AudioSchema, BindingsSchema, BroadcastSchema } from "./zod-schema.agents.js";
 import { ApprovalsSchema } from "./zod-schema.approvals.js";
 import {
@@ -875,6 +875,7 @@ export const OpenClawSchema = z
         }
       })
       .optional(),
+    research: ResearchSchema,
     memory: MemorySchema,
     mcp: McpConfigSchema,
     skills: z
@@ -908,6 +909,23 @@ export const OpenClawSchema = z
           .strict()
           .optional(),
         entries: z.record(z.string(), SkillEntrySchema).optional(),
+        hive: z
+          .object({
+            enabled: z.boolean().optional(),
+            consortiums: z
+              .array(
+                z
+                  .object({
+                    id: z.string().min(1),
+                    memberAgentIds: z.array(z.string()).optional(),
+                    label: z.string().optional(),
+                  })
+                  .strict(),
+              )
+              .optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),

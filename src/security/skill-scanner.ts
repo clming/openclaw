@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { hasErrnoCode } from "../infra/errors.js";
 import { isPathInside } from "./scan-paths.js";
+import { scanSkillMarkdown } from "./skill-md-scanner.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,12 +19,17 @@ export type SkillScanFinding = {
   evidence: string;
 };
 
+/** Bump when scanner rules / rule IDs change so lockfile can track re-verification. */
+export const SKILL_SCAN_POLICY_VERSION = "2026-03-24";
+
 export type SkillScanSummary = {
   scannedFiles: number;
   critical: number;
   warn: number;
   info: number;
   findings: SkillScanFinding[];
+  /** Policy generation for managed lockfile `lastVerifiedPolicyVersion`. */
+  policyVersion: string;
 };
 
 export type SkillScanOptions = {
@@ -456,6 +462,52 @@ async function collectScannableFiles(dirPath: string, opts: Required<SkillScanOp
   return out;
 }
 
+function isSkillMarkdownFile(filePath: string): boolean {
+  return path.basename(filePath).toLowerCase() === "skill.md";
+}
+
+async function collectSkillMarkdownFiles(
+  dirPath: string,
+  opts: Required<SkillScanOptions>,
+): Promise<string[]> {
+  const walkBudget = Math.max(0, opts.maxFiles);
+  const stack: string[] = [dirPath];
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  while (stack.length > 0 && out.length < walkBudget) {
+    const currentDir = stack.pop();
+    if (!currentDir) {
+      break;
+    }
+    const entries = await readDirEntriesWithCache(currentDir);
+    for (const entry of entries) {
+      if (out.length >= walkBudget) {
+        break;
+      }
+      if (entry.name.startsWith(".") || entry.name === "node_modules") {
+        continue;
+      }
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.kind === "dir") {
+        stack.push(fullPath);
+        continue;
+      }
+      if (entry.kind !== "file" || !isSkillMarkdownFile(entry.name)) {
+        continue;
+      }
+      const resolved = path.resolve(fullPath);
+      if (seen.has(resolved) || !isPathInside(dirPath, resolved)) {
+        continue;
+      }
+      seen.add(resolved);
+      out.push(resolved);
+    }
+  }
+
+  return out;
+}
+
 async function scanFileWithCache(params: {
   filePath: string;
   maxFileBytes: number;
@@ -546,6 +598,7 @@ export async function scanDirectoryWithSummary(
 ): Promise<SkillScanSummary> {
   const scanOptions = normalizeScanOptions(opts);
   const files = await collectScannableFiles(dirPath, scanOptions);
+  const markdownFiles = await collectSkillMarkdownFiles(dirPath, scanOptions);
   const allFindings: SkillScanFinding[] = [];
   let scannedFiles = 0;
   let critical = 0;
@@ -573,11 +626,40 @@ export async function scanDirectoryWithSummary(
     }
   }
 
+  for (const file of markdownFiles) {
+    let st: Awaited<ReturnType<typeof fs.stat>> | null = null;
+    try {
+      st = await fs.stat(file);
+    } catch (err) {
+      if (hasErrnoCode(err, "ENOENT")) {
+        continue;
+      }
+      throw err;
+    }
+    if (!st?.isFile() || st.size > scanOptions.maxFileBytes) {
+      continue;
+    }
+    const source = await fs.readFile(file, "utf-8");
+    const findings = scanSkillMarkdown({ text: source, filePath: file });
+    scannedFiles += 1;
+    for (const finding of findings) {
+      allFindings.push(finding);
+      if (finding.severity === "critical") {
+        critical += 1;
+      } else if (finding.severity === "warn") {
+        warn += 1;
+      } else {
+        info += 1;
+      }
+    }
+  }
+
   return {
     scannedFiles,
     critical,
     warn,
     info,
     findings: allFindings,
+    policyVersion: SKILL_SCAN_POLICY_VERSION,
   };
 }
