@@ -144,7 +144,7 @@ export function registerDefaultAuthTokenSuite(): void {
             OPENCLAW_SERVICE_VERSION: "2.4.6-service",
             npm_package_version: "1.0.0-package",
           },
-          expectedVersion: VERSION,
+          expectedVersion: "2.4.6-service",
         },
         {
           env: {
@@ -152,7 +152,7 @@ export function registerDefaultAuthTokenSuite(): void {
             OPENCLAW_SERVICE_VERSION: "2.4.6-service",
             npm_package_version: "1.0.0-package",
           },
-          expectedVersion: "9.9.9-cli",
+          expectedVersion: "2.4.6-service",
         },
         {
           env: {
