@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "../styles.css";
+import { i18n } from "../i18n/index.ts";
+import { commandPaletteShortcutLabel } from "./keyboard-shortcuts.ts";
 import { mountApp as mountTestApp, registerAppMountHooks } from "./test-helpers/app-mount.ts";
 
 registerAppMountHooks();
@@ -72,6 +74,41 @@ describe("control UI routing", () => {
     expect(app.querySelector(".topnav-shell__content")).not.toBeNull();
     expect(app.querySelector(".topnav-shell__actions")).not.toBeNull();
     expect(app.querySelector(".topnav-shell .brand-title")).toBeNull();
+  });
+
+  it("localizes shell controls in zh-CN", async () => {
+    await i18n.setLocale("zh-CN");
+    const app = mountApp("/chat");
+    await app.updateComplete;
+
+    const shortcut = commandPaletteShortcutLabel();
+    const searchButton = app.querySelector<HTMLButtonElement>(".topbar-search");
+    const searchShortcut = app.querySelector<HTMLElement>(".topbar-search__kbd");
+    const themeMode = app.querySelector<HTMLElement>(".topbar-theme-mode");
+    const activeThemeModeButton = app.querySelector<HTMLElement>(
+      ".topbar-theme-mode__btn[aria-pressed='true']",
+    );
+
+    expect(searchButton?.getAttribute("title")).toBe(`搜索或跳转… (${shortcut})`);
+    expect(searchButton?.getAttribute("aria-label")).toBe("打开命令面板");
+    expect(searchShortcut?.textContent).toBe(shortcut);
+    expect(themeMode?.getAttribute("aria-label")).toBe("颜色模式");
+    expect(activeThemeModeButton?.getAttribute("aria-label")).toContain("颜色模式：");
+  });
+
+  it("localizes login gate visibility controls in zh-CN", async () => {
+    await i18n.setLocale("zh-CN");
+    const app = mountApp("/overview");
+    app.connected = false;
+    app.requestUpdate();
+    await app.updateComplete;
+
+    const buttons = app.querySelectorAll<HTMLButtonElement>(".login-gate__secret-row button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]?.getAttribute("title")).toBe("显示令牌");
+    expect(buttons[0]?.getAttribute("aria-label")).toBe("切换令牌可见性");
+    expect(buttons[1]?.getAttribute("title")).toBe("显示密码");
+    expect(buttons[1]?.getAttribute("aria-label")).toBe("切换密码可见性");
   });
 
   it("renders the refreshed sidebar shell structure", async () => {

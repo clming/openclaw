@@ -395,8 +395,8 @@ export function renderChatMobileToggle(state: AppViewState) {
             }
           }
         }}
-        title="Chat settings"
-        aria-label="Chat settings"
+        title=${t("chat.settings")}
+        aria-label=${t("chat.settings")}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
@@ -900,15 +900,19 @@ const THEME_OPTIONS: ThemeOption[] = [
   { id: "dash", label: "Dash", icon: "📊" },
 ];
 
-type ThemeModeOption = { id: ThemeMode; label: string; short: string };
+type ThemeModeOption = { id: ThemeMode; short: string };
 const THEME_MODE_OPTIONS: ThemeModeOption[] = [
-  { id: "system", label: "System", short: "SYS" },
-  { id: "light", label: "Light", short: "LIGHT" },
-  { id: "dark", label: "Dark", short: "DARK" },
+  { id: "system", short: "SYS" },
+  { id: "light", short: "LIGHT" },
+  { id: "dark", short: "DARK" },
 ];
 
 function currentThemeIcon(theme: ThemeName): string {
   return THEME_OPTIONS.find((o) => o.id === theme)?.icon ?? "🎨";
+}
+
+function themeModeLabel(mode: ThemeMode): string {
+  return t(`theme.modes.${mode}`);
 }
 
 export function renderTopbarThemeModeToggle(state: AppViewState) {
@@ -930,20 +934,23 @@ export function renderTopbarThemeModeToggle(state: AppViewState) {
   };
 
   return html`
-    <div class="topbar-theme-mode" role="group" aria-label="Color mode">
+    <div class="topbar-theme-mode" role="group" aria-label=${t("shell.colorMode")}>
       ${THEME_MODE_OPTIONS.map(
-        (opt) => html`
+        (opt) => {
+          const label = themeModeLabel(opt.id);
+          return html`
           <button
             type="button"
             class="topbar-theme-mode__btn ${opt.id === state.themeMode ? "topbar-theme-mode__btn--active" : ""}"
-            title=${opt.label}
-            aria-label="Color mode: ${opt.label}"
+            title=${label}
+            aria-label=${t("shell.colorModeCurrent", { mode: label })}
             aria-pressed=${opt.id === state.themeMode}
             @click=${(e: Event) => applyMode(opt.id, e)}
           >
             ${modeIcon(opt.id)}
           </button>
-        `,
+        `;
+        },
       )}
     </div>
   `;
@@ -960,8 +967,8 @@ export function renderSidebarConnectionStatus(state: AppViewState) {
       class="sidebar-version__status ${toneClass}"
       role="img"
       aria-live="polite"
-      aria-label="Gateway status: ${label}"
-      title="Gateway status: ${label}"
+      aria-label=${t("shell.gatewayStatus", { status: label })}
+      title=${t("shell.gatewayStatus", { status: label })}
     ></span>
   `;
 }
@@ -1011,11 +1018,11 @@ export function renderThemeToggle(state: AppViewState) {
   };
 
   return html`
-    <div class="theme-orb" aria-label="Theme">
+    <div class="theme-orb" aria-label=${t("common.theme")}>
       <button
         type="button"
         class="theme-orb__trigger"
-        title="Theme"
+        title=${t("common.theme")}
         aria-haspopup="menu"
         aria-expanded="false"
         @click=${toggleOpen}
