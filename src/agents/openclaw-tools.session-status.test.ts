@@ -494,6 +494,47 @@ describe("session_status tool", () => {
     );
   });
 
+  it("reports per-agent outbound deny for cross-agent session_status", async () => {
+    resetSessionStore({
+      "agent:other:main": {
+        sessionId: "s2",
+        updatedAt: 10,
+      },
+    });
+
+    mockConfig = {
+      session: { mainKey: "main", scope: "per-sender" },
+      tools: {
+        agentToAgent: {
+          enabled: true,
+          allow: ["main", "other"],
+        },
+      },
+      agents: {
+        defaults: {
+          model: { primary: "anthropic/claude-opus-4-5" },
+          models: {},
+        },
+        list: [
+          {
+            id: "main",
+            tools: {
+              agentToAgent: {
+                allow: [],
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    const tool = getSessionStatusTool("agent:main:main");
+
+    await expect(tool.execute("call5b", { sessionKey: "agent:other:main" })).rejects.toThrow(
+      "Agent-to-agent session status denied by agents.list[].tools.agentToAgent.allow for the requester agent.",
+    );
+  });
+
   it("blocks sandboxed child session_status access outside its tree before store lookup", async () => {
     resetSessionStore({
       "agent:main:subagent:child": {
