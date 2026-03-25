@@ -167,6 +167,8 @@ describe("AcpxRuntime", () => {
     const prompt = logs.find((entry) => entry.kind === "prompt");
     expect(ensure).toBeDefined();
     expect(prompt).toBeDefined();
+    const ensureArgs = (ensure?.args as string[]) ?? [];
+    expect(ensureArgs).toContain("--approve-all");
     expect(prompt?.openclawShell).toBe("acp");
     expect(Array.isArray(prompt?.args)).toBe(true);
     const promptArgs = (prompt?.args as string[]) ?? [];
@@ -196,6 +198,7 @@ describe("AcpxRuntime", () => {
     );
     expect(resumeEntry).toBeDefined();
     const resumeArgs = (resumeEntry?.args as string[]) ?? [];
+    expect(resumeArgs).toContain("--approve-all");
     const resumeFlagIndex = resumeArgs.indexOf("--resume-session");
     expect(resumeFlagIndex).toBeGreaterThanOrEqual(0);
     expect(resumeArgs[resumeFlagIndex + 1]).toBe(resumeSessionId);
@@ -437,6 +440,41 @@ describe("AcpxRuntime", () => {
     );
   });
 
+  it("applies updated permission flags when reusing an existing session handle", async () => {
+    const first = await createMockRuntimeFixture({
+      permissionMode: "approve-reads",
+    });
+    const handle = await first.runtime.ensureSession({
+      sessionKey: "agent:claude:acp:permission-updated",
+      agent: "claude",
+      mode: "persistent",
+    });
+
+    const second = await createMockRuntimeFixture({
+      permissionMode: "approve-all",
+    });
+    for await (const _event of second.runtime.runTurn({
+      handle,
+      text: "reuse-updated-permissions",
+      mode: "prompt",
+      requestId: "req-reuse-updated-permissions",
+    })) {
+      // Drain events; assertions inspect the mock runtime log.
+    }
+
+    const logs = await readMockRuntimeLogEntries(second.logPath);
+    const prompt = logs.find(
+      (entry) =>
+        entry.kind === "prompt" &&
+        String(entry.sessionName ?? "") === "agent:claude:acp:permission-updated",
+    );
+    expect(prompt).toBeDefined();
+    const promptArgs = (prompt?.args as string[]) ?? [];
+    expect(promptArgs).toContain("--approve-all");
+    expect(promptArgs).toContain("--non-interactive-permissions");
+    expect(promptArgs).toContain("fail");
+  });
+
   it("supports cancel and close using encoded runtime handle state", async () => {
     const { runtime, logPath, config } = await createMockRuntimeFixture();
     const handle = await runtime.ensureSession({
@@ -658,7 +696,10 @@ describe("AcpxRuntime", () => {
 
       const logs = await readMockRuntimeLogEntries(logPath);
       expect(logs.some((entry) => entry.kind === "ensure")).toBe(true);
-      expect(logs.some((entry) => entry.kind === "new")).toBe(true);
+      const newEntry = logs.find((entry) => entry.kind === "new");
+      expect(newEntry).toBeDefined();
+      const newArgs = (newEntry?.args as string[]) ?? [];
+      expect(newArgs).toContain("--approve-all");
     } finally {
       delete process.env.MOCK_ACPX_ENSURE_EMPTY;
     }

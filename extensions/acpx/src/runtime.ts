@@ -293,10 +293,24 @@ export class AcpxRuntime implements AcpRuntime {
         agent: params.agent,
         cwd: params.cwd,
         command,
+        prefix: this.buildSessionInitPrefix(params.cwd),
       }),
       cwd: params.cwd,
       fallbackCode: "ACP_SESSION_INIT_FAILED",
     });
+  }
+
+  private buildSessionInitPrefix(cwd: string): string[] {
+    return [
+      "--format",
+      "json",
+      "--json-strict",
+      "--cwd",
+      cwd,
+      ...buildPermissionArgs(this.config.permissionMode),
+      "--non-interactive-permissions",
+      this.config.nonInteractivePermissions,
+    ];
   }
 
   private async shouldReplaceEnsuredSession(params: {
@@ -439,6 +453,7 @@ export class AcpxRuntime implements AcpRuntime {
             agent,
             cwd,
             command: ["sessions", "ensure", "--name", sessionName],
+            prefix: this.buildSessionInitPrefix(cwd),
           }),
           cwd,
           fallbackCode: "ACP_SESSION_INIT_FAILED",
@@ -878,16 +893,7 @@ export class AcpxRuntime implements AcpRuntime {
     sessionName: string;
     cwd: string;
   }): Promise<string[]> {
-    const prefix = [
-      "--format",
-      "json",
-      "--json-strict",
-      "--cwd",
-      params.cwd,
-      ...buildPermissionArgs(this.config.permissionMode),
-      "--non-interactive-permissions",
-      this.config.nonInteractivePermissions,
-    ];
+    const prefix = [...this.buildSessionInitPrefix(params.cwd)];
     if (this.config.timeoutSeconds) {
       prefix.push("--timeout", String(this.config.timeoutSeconds));
     }
