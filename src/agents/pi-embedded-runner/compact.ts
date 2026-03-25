@@ -67,7 +67,7 @@ import {
 import { createPreparedEmbeddedPiSettingsManager } from "../pi-project-settings.js";
 import { createOpenClawCodingTools } from "../pi-tools.js";
 import {
-  isToolAllowedByPolicyName,
+  filterToolsByPolicy,
   resolveSubagentToolPolicyForSession,
 } from "../pi-tools.policy.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
@@ -848,16 +848,8 @@ export async function compactEmbeddedPiSessionDirect(
         : undefined;
 
     // Filter MCP/LSP tools through subagent policy (same filtering applied to built-in tools)
-    const filteredMcpTools = subagentToolPolicy
-      ? (bundleMcpRuntime?.tools ?? []).filter((tool) =>
-          isToolAllowedByPolicyName(tool.name, subagentToolPolicy),
-        )
-      : (bundleMcpRuntime?.tools ?? []);
-    const filteredLspTools = subagentToolPolicy
-      ? (bundleLspRuntime?.tools ?? []).filter((tool) =>
-          isToolAllowedByPolicyName(tool.name, subagentToolPolicy),
-        )
-      : (bundleLspRuntime?.tools ?? []);
+    const filteredMcpTools = filterToolsByPolicy(bundleMcpRuntime?.tools ?? [], subagentToolPolicy);
+    const filteredLspTools = filterToolsByPolicy(bundleLspRuntime?.tools ?? [], subagentToolPolicy);
 
     const effectiveTools = [...tools, ...filteredMcpTools, ...filteredLspTools];
     const allowedToolNames = collectAllowedToolNames({ tools: effectiveTools });
