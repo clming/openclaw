@@ -154,6 +154,18 @@ function createLiveTtsConfig(): ResolvedTtsConfig {
       outputFormatConfigured: false,
       saveSubtitles: false,
     },
+    typecast: {
+      baseHost: "https://typecast.ai",
+      model: "ssfm-v30",
+      emotionPreset: "normal",
+      emotionIntensity: 1.0,
+      output: {
+        volume: 100,
+        audioPitch: 0,
+        audioTempo: 1.0,
+        audioFormat: "mp3",
+      },
+    },
     maxTextLength: 4_000,
     timeoutMs: 30_000,
   };

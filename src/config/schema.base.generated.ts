@@ -8398,6 +8398,130 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
                 },
                 additionalProperties: false,
               },
+              typecast: {
+                type: "object",
+                properties: {
+                  apiKey: {
+                    anyOf: [
+                      {
+                        type: "string",
+                      },
+                      {
+                        oneOf: [
+                          {
+                            type: "object",
+                            properties: {
+                              source: {
+                                type: "string",
+                                const: "env",
+                              },
+                              provider: {
+                                type: "string",
+                                pattern: "^[a-z][a-z0-9_-]{0,63}$",
+                              },
+                              id: {
+                                type: "string",
+                                pattern: "^[A-Z][A-Z0-9_]{0,127}$",
+                              },
+                            },
+                            required: ["source", "provider", "id"],
+                            additionalProperties: false,
+                          },
+                          {
+                            type: "object",
+                            properties: {
+                              source: {
+                                type: "string",
+                                const: "file",
+                              },
+                              provider: {
+                                type: "string",
+                                pattern: "^[a-z][a-z0-9_-]{0,63}$",
+                              },
+                              id: {
+                                type: "string",
+                              },
+                            },
+                            required: ["source", "provider", "id"],
+                            additionalProperties: false,
+                          },
+                          {
+                            type: "object",
+                            properties: {
+                              source: {
+                                type: "string",
+                                const: "exec",
+                              },
+                              provider: {
+                                type: "string",
+                                pattern: "^[a-z][a-z0-9_-]{0,63}$",
+                              },
+                              id: {
+                                type: "string",
+                              },
+                            },
+                            required: ["source", "provider", "id"],
+                            additionalProperties: false,
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  baseHost: {
+                    type: "string",
+                  },
+                  voiceId: {
+                    type: "string",
+                  },
+                  model: {
+                    type: "string",
+                    enum: ["ssfm-v21", "ssfm-v30"],
+                  },
+                  language: {
+                    type: "string",
+                  },
+                  emotionPreset: {
+                    type: "string",
+                    enum: ["normal", "happy", "sad", "angry", "whisper", "toneup", "tonedown"],
+                  },
+                  emotionIntensity: {
+                    type: "number",
+                    minimum: 0,
+                    maximum: 2,
+                  },
+                  seed: {
+                    type: "integer",
+                    minimum: 0,
+                    maximum: 9007199254740991,
+                  },
+                  output: {
+                    type: "object",
+                    properties: {
+                      volume: {
+                        type: "number",
+                        minimum: 0,
+                        maximum: 200,
+                      },
+                      audioPitch: {
+                        type: "number",
+                        minimum: -12,
+                        maximum: 12,
+                      },
+                      audioTempo: {
+                        type: "number",
+                        minimum: 0.5,
+                        maximum: 2,
+                      },
+                      audioFormat: {
+                        type: "string",
+                        enum: ["wav", "mp3"],
+                      },
+                    },
+                    additionalProperties: false,
+                  },
+                },
+                additionalProperties: false,
+              },
               edge: {
                 type: "object",
                 properties: {
@@ -16185,6 +16309,10 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
       sensitive: true,
       tags: ["security", "auth", "media"],
     },
+    "messages.tts.typecast.apiKey": {
+      sensitive: true,
+      tags: ["security", "auth", "media"],
+    },
     "channels.telegram.webhookSecret": {
       sensitive: true,
       tags: ["security", "auth", "network", "channels"],
@@ -16205,6 +16333,10 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
       sensitive: true,
       tags: ["security", "auth", "network", "media", "channels"],
     },
+    "channels.discord.voice.tts.typecast.apiKey": {
+      sensitive: true,
+      tags: ["security", "auth", "network", "media", "channels"],
+    },
     "channels.discord.accounts.*.token": {
       sensitive: true,
       tags: ["security", "auth", "network", "channels"],
@@ -16214,6 +16346,10 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
       tags: ["security", "auth", "network", "media", "channels"],
     },
     "channels.discord.accounts.*.voice.tts.openai.apiKey": {
+      sensitive: true,
+      tags: ["security", "auth", "network", "media", "channels"],
+    },
+    "channels.discord.accounts.*.voice.tts.typecast.apiKey": {
       sensitive: true,
       tags: ["security", "auth", "network", "media", "channels"],
     },

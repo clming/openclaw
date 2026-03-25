@@ -446,6 +446,30 @@ export const TtsConfigSchema = z
       })
       .strict()
       .optional(),
+    typecast: z
+      .object({
+        apiKey: SecretInputSchema.optional().register(sensitive),
+        baseHost: z.string().optional(),
+        voiceId: z.string().optional(),
+        model: z.enum(["ssfm-v21", "ssfm-v30"]).optional(),
+        language: z.string().optional(),
+        emotionPreset: z
+          .enum(["normal", "happy", "sad", "angry", "whisper", "toneup", "tonedown"])
+          .optional(),
+        emotionIntensity: z.number().min(0).max(2).optional(),
+        seed: z.number().int().min(0).optional(),
+        output: z
+          .object({
+            volume: z.number().min(0).max(200).optional(),
+            audioPitch: z.number().min(-12).max(12).optional(),
+            audioTempo: z.number().min(0.5).max(2).optional(),
+            audioFormat: z.enum(["wav", "mp3"]).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     edge: TtsMicrosoftConfigSchema,
     microsoft: TtsMicrosoftConfigSchema,
     prefsPath: z.string().optional(),
