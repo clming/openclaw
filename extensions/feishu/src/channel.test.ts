@@ -1,3 +1,4 @@
+import { Type } from "@sinclair/typebox";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../runtime-api.js";
 import { looksLikeFeishuId, normalizeFeishuTarget, resolveReceiveIdType } from "./targets.js";
@@ -162,6 +163,16 @@ describe("feishuPlugin actions", () => {
     ]);
   });
 
+  it("keeps card optional in the message tool schema", () => {
+    const discovery = feishuPlugin.actions?.describeMessageTool?.({ cfg });
+    const schema = discovery?.schema;
+    if (!schema || Array.isArray(schema)) {
+      throw new Error("expected feishu message-tool schema");
+    }
+
+    expect(Type.Object(schema.properties).required).toBeUndefined();
+  });
+
   it("sends text messages", async () => {
     sendMessageFeishuMock.mockResolvedValueOnce({ messageId: "om_sent", chatId: "oc_group_1" });
 
@@ -236,6 +247,37 @@ describe("feishuPlugin actions", () => {
       replyToId: undefined,
     });
     expect(result?.details).toMatchObject({ messageId: "om_media" });
+  });
+
+  it("sends media-only payloads through the outbound adapter without card", async () => {
+    feishuOutboundSendMediaMock.mockResolvedValueOnce({
+      channel: "feishu",
+      messageId: "om_media_only",
+      details: { messageId: "om_media_only", chatId: "oc_group_1" },
+    });
+
+    const result = await feishuPlugin.actions?.handleAction?.({
+      action: "send",
+      params: {
+        to: "chat:oc_group_1",
+        media: "/tmp/image.png",
+      },
+      cfg,
+      accountId: undefined,
+      toolContext: {},
+      mediaLocalRoots: ["/tmp"],
+    } as never);
+
+    expect(feishuOutboundSendMediaMock).toHaveBeenCalledWith({
+      cfg,
+      to: "chat:oc_group_1",
+      text: "",
+      mediaUrl: "/tmp/image.png",
+      accountId: undefined,
+      mediaLocalRoots: ["/tmp"],
+      replyToId: undefined,
+    });
+    expect(result?.details).toMatchObject({ messageId: "om_media_only" });
   });
 
   it("reads messages", async () => {

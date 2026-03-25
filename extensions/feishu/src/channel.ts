@@ -1,3 +1,4 @@
+import { Type } from "@sinclair/typebox";
 import { describeAccountSnapshot } from "openclaw/plugin-sdk/account-helpers";
 import { formatAllowFromLowercase } from "openclaw/plugin-sdk/allow-from";
 import { createMessageToolCardSchema } from "openclaw/plugin-sdk/channel-actions";
@@ -109,7 +110,7 @@ function describeFeishuMessageTool({
       schema: enabled
         ? {
             properties: {
-              card: createMessageToolCardSchema(),
+              card: Type.Optional(createMessageToolCardSchema()),
             },
           }
         : null,
@@ -137,7 +138,7 @@ function describeFeishuMessageTool({
     schema: enabled
       ? {
           properties: {
-            card: createMessageToolCardSchema(),
+            card: Type.Optional(createMessageToolCardSchema()),
           },
         }
       : null,
