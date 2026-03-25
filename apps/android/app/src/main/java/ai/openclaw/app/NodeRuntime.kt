@@ -273,6 +273,7 @@ class NodeRuntime(
         _seamColorArgb.value = DEFAULT_SEAM_COLOR_ARGB
         if (!isCanonicalMainSessionKey(_mainSessionKey.value)) {
           _mainSessionKey.value = generateNodeSessionKey()
+          talkMode.setMainSessionKey(_mainSessionKey.value)
         }
         chat.applyMainSessionKey(resolveMainSessionKey())
         chat.onDisconnected(message)
