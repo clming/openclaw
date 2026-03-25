@@ -560,7 +560,15 @@ export const slackPlugin: ChannelPlugin<ResolvedSlackAccount, SlackProbe> = crea
         if (requestChannel !== "slack") {
           return false;
         }
-        const accountId = target.accountId?.trim() || request.request.turnSourceAccountId?.trim();
+        const targetAccountId = target.accountId?.trim();
+        const sourceAccountId = request.request.turnSourceAccountId?.trim();
+        // Only suppress if the target account matches the source account (or
+        // both are unset). In multi-account setups a cross-account forward
+        // should not be suppressed since the native handler skips mismatches.
+        if (targetAccountId && sourceAccountId && targetAccountId !== sourceAccountId) {
+          return false;
+        }
+        const accountId = targetAccountId || sourceAccountId;
         return isSlackExecApprovalClientEnabled({ cfg, accountId });
       },
     },

@@ -398,18 +398,23 @@ export class SlackExecApprovalHandler {
           ...(target.threadTs ? { thread_ts: target.threadTs } : {}),
         });
         if (result.ts) {
-          // If the pending entry was cleared during the await (concurrent resolve),
-          // immediately update this stale message to remove buttons.
+          // If the pending entry was cleared during the await (concurrent
+          // resolve or expiry), immediately update this stale message to
+          // remove buttons. Use a neutral label since we don't know whether
+          // the approval was resolved or expired.
           if (!this.pending.has(request.id)) {
             await this.opts.client.chat
               .update({
                 channel: channelId,
                 ts: result.ts,
-                text: "Exec approval resolved.",
+                text: "Exec approval is no longer pending.",
                 blocks: [
                   {
                     type: "section",
-                    text: { type: "mrkdwn", text: ":white_check_mark: Exec approval resolved." },
+                    text: {
+                      type: "mrkdwn",
+                      text: "Exec approval is no longer pending.",
+                    },
                   },
                 ],
               })
