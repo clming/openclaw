@@ -73,7 +73,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
     if (!legacyKey) {
       return {
         ok: false,
-        error: errorShape(ErrorCodes.INVALID_REQUEST, `No session found: ${key}`),
+        error: errorShape(ErrorCodes.SESSION_NOT_FOUND, `No session found: ${key}`),
       };
     }
     await updateSessionStore(target.storePath, (s) => {
@@ -123,7 +123,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
     if (matches.length === 0) {
       return {
         ok: false,
-        error: errorShape(ErrorCodes.INVALID_REQUEST, `No session found: ${sessionId}`),
+        error: errorShape(ErrorCodes.SESSION_NOT_FOUND, `No session found: ${sessionId}`),
       };
     }
     if (matches.length > 1) {
@@ -165,7 +165,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
     return {
       ok: false,
       error: errorShape(
-        ErrorCodes.INVALID_REQUEST,
+        ErrorCodes.SESSION_NOT_FOUND,
         `No session found with label: ${parsedLabel.label}`,
       ),
     };

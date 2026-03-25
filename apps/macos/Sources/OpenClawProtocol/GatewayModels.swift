@@ -10,6 +10,9 @@ public enum ErrorCode: String, Codable, Sendable {
     case agentTimeout = "AGENT_TIMEOUT"
     case invalidRequest = "INVALID_REQUEST"
     case unavailable = "UNAVAILABLE"
+    case sessionNotFound = "SESSION_NOT_FOUND"
+    case agentNotFound = "AGENT_NOT_FOUND"
+    case sessionAutoStarted = "SESSION_AUTO_STARTED"
 }
 
 public struct ConnectParams: Codable, Sendable {
@@ -1395,6 +1398,24 @@ public struct SessionsSendParams: Codable, Sendable {
         case attachments
         case timeoutms = "timeoutMs"
         case idempotencykey = "idempotencyKey"
+    }
+}
+
+public struct SessionsStartParams: Codable, Sendable {
+    public let agentid: String
+    public let force: Bool?
+
+    public init(
+        agentid: String,
+        force: Bool?)
+    {
+        self.agentid = agentid
+        self.force = force
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case agentid = "agentId"
+        case force
     }
 }
 

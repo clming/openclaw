@@ -392,6 +392,15 @@ async function inspectManualRunPreflight(
     // persist does not block manual triggers for up to STUCK_RUN_MS (#17554).
     recomputeNextRunsForMaintenance(state);
     const job = findJobOrThrow(state, id);
+    // For force mode, also correct any stale/wrong nextRunAtMs for the specific job.
+    // This fixes jobs stuck with a wrong timestamp from timezone bugs.
+    if (mode === "force" && job.enabled) {
+      const now = state.deps.nowMs();
+      const newNext = computeJobNextRunAtMs(job, now);
+      if (job.state.nextRunAtMs !== newNext) {
+        job.state.nextRunAtMs = newNext;
+      }
+    }
     if (typeof job.state.runningAtMs === "number") {
       return { ok: true, ran: false, reason: "already-running" as const };
     }
