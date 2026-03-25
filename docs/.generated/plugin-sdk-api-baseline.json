@@ -51,6 +51,15 @@
           }
         },
         {
+          "declaration": "export function normalizeAccountId(value: string | null | undefined): string;",
+          "exportName": "normalizeAccountId",
+          "kind": "function",
+          "source": {
+            "line": 34,
+            "path": "src/routing/account-id.ts"
+          }
+        },
+        {
           "declaration": "export function onDiagnosticEvent(listener: (evt: DiagnosticEventPayload) => void): () => void;",
           "exportName": "onDiagnosticEvent",
           "kind": "function",
@@ -66,6 +75,15 @@
           "source": {
             "line": 377,
             "path": "src/context-engine/registry.ts"
+          }
+        },
+        {
+          "declaration": "export function resolvePreferredOpenClawTmpDir(options?: ResolvePreferredOpenClawTmpDirOptions): string;",
+          "exportName": "resolvePreferredOpenClawTmpDir",
+          "kind": "function",
+          "source": {
+            "line": 34,
+            "path": "src/infra/tmp-openclaw-dir.ts"
           }
         },
         {
