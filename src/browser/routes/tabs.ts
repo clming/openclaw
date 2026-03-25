@@ -1,3 +1,4 @@
+import { isWebSocketUrl } from "../cdp.helpers.js";
 import { BrowserProfileUnavailableError, BrowserTabNotFoundError } from "../errors.js";
 import {
   assertBrowserNavigationAllowed,
@@ -53,7 +54,25 @@ async function withTabsProfileRoute(params: {
   }
 }
 
+function usesLazyRemoteWebSocketReconnect(profileCtx: ProfileContext) {
+  return !profileCtx.profile.cdpIsLoopback && isWebSocketUrl(profileCtx.profile.cdpUrl);
+}
+
 async function ensureBrowserRunning(profileCtx: ProfileContext, res: BrowserResponse) {
+  if (usesLazyRemoteWebSocketReconnect(profileCtx)) {
+    try {
+      // Remote WebSocket profiles reconnect on demand through the Playwright-backed tab ops.
+      await profileCtx.listTabs();
+      return true;
+    } catch {
+      jsonError(
+        res,
+        new BrowserProfileUnavailableError("browser not running").status,
+        "browser not running",
+      );
+      return false;
+    }
+  }
   if (!(await profileCtx.isReachable(300))) {
     jsonError(
       res,
@@ -110,6 +129,14 @@ export function registerBrowserTabRoutes(app: BrowserRouteRegistrar, ctx: Browse
       res,
       ctx,
       run: async (profileCtx) => {
+        if (usesLazyRemoteWebSocketReconnect(profileCtx)) {
+          try {
+            const tabs = await profileCtx.listTabs();
+            return res.json({ running: true, tabs });
+          } catch {
+            return res.json({ running: false, tabs: [] as unknown[] });
+          }
+        }
         const reachable = await profileCtx.isReachable(300);
         if (!reachable) {
           return res.json({ running: false, tabs: [] as unknown[] });
@@ -186,6 +213,14 @@ export function registerBrowserTabRoutes(app: BrowserRouteRegistrar, ctx: Browse
       mapTabError: true,
       run: async (profileCtx) => {
         if (action === "list") {
+          if (usesLazyRemoteWebSocketReconnect(profileCtx)) {
+            try {
+              const tabs = await profileCtx.listTabs();
+              return res.json({ ok: true, tabs });
+            } catch {
+              return res.json({ ok: true, tabs: [] as unknown[] });
+            }
+          }
           const reachable = await profileCtx.isReachable(300);
           if (!reachable) {
             return res.json({ ok: true, tabs: [] as unknown[] });
