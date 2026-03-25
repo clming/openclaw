@@ -80,9 +80,22 @@ function buildResetSessionNoticeText(params: {
   model: string;
   defaultProvider: string;
   defaultModel: string;
+  template?: string;
 }): string {
   const modelLabel = `${params.provider}/${params.model}`;
   const defaultLabel = `${params.defaultProvider}/${params.defaultModel}`;
+
+  if (params.template) {
+    return params.template
+      .replace(/\{modelFull\}/gi, modelLabel)
+      .replace(/\{model\}/gi, params.model)
+      .replace(/\{provider\}/gi, params.provider)
+      .replace(/\{defaultModelFull\}/gi, defaultLabel)
+      .replace(/\{defaultModel\}/gi, params.defaultModel)
+      .replace(/\{defaultProvider\}/gi, params.defaultProvider);
+  }
+
+  // Default template when not configured
   return modelLabel === defaultLabel
     ? `✅ New session started · model: ${modelLabel}`
     : `✅ New session started · model: ${modelLabel} (default: ${defaultLabel})`;
@@ -135,6 +148,7 @@ async function sendResetSessionNotice(params: {
         model: params.model,
         defaultProvider: params.defaultProvider,
         defaultModel: params.defaultModel,
+        template: params.cfg.session?.resetNoticeText,
       }),
     },
     channel: route.channel,
