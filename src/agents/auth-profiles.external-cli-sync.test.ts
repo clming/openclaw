@@ -82,7 +82,6 @@ describe("syncExternalCliCredentials", () => {
     } = await import("./auth-profiles/constants.js"));
   });
 
-
   describe("shouldReplaceStoredOAuthCredential", () => {
     it("keeps equivalent stored credentials", () => {
       const stored = makeOAuthCredential({ provider: "openai-codex", access: "a", refresh: "r" });
