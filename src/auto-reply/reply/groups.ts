@@ -1,3 +1,4 @@
+import { sanitizeForPromptLiteral } from "../../agents/sanitize-for-prompt.js";
 import { resolveDiscordGroupRequireMention } from "../../../extensions/discord/api.js";
 import { resolveSlackGroupRequireMention } from "../../../extensions/slack/api.js";
 import {
@@ -152,16 +153,18 @@ function resolveProviderLabel(rawProvider: string | undefined): string {
 export function buildGroupChatContext(params: { sessionCtx: TemplateContext }): string {
   const subject = params.sessionCtx.GroupSubject?.trim();
   const members = params.sessionCtx.GroupMembers?.trim();
+  const safeSubject = subject ? sanitizeForPromptLiteral(subject) : undefined;
+  const safeMembers = members ? sanitizeForPromptLiteral(members) : undefined;
   const providerLabel = resolveProviderLabel(params.sessionCtx.Provider);
 
   const lines: string[] = [];
-  if (subject) {
-    lines.push(`You are in the ${providerLabel} group chat "${subject}".`);
+  if (safeSubject) {
+    lines.push(`You are in the ${providerLabel} group chat "${safeSubject}".`);
   } else {
     lines.push(`You are in a ${providerLabel} group chat.`);
   }
-  if (members) {
-    lines.push(`Participants: ${members}.`);
+  if (safeMembers) {
+    lines.push(`Participants: ${safeMembers}.`);
   }
   lines.push(
     "Your replies are automatically sent to this group chat. Do not use the message tool to send to this same group — just reply normally.",
@@ -185,9 +188,11 @@ export function buildGroupIntro(params: {
       ? "Activation: always-on (you receive every group message)."
       : "Activation: trigger-only (you are invoked only when explicitly mentioned; recent context may be included).";
   const groupId = params.sessionEntry?.groupId ?? extractGroupId(params.sessionCtx.From);
-  const groupChannel =
+  const rawGroupChannel =
     params.sessionCtx.GroupChannel?.trim() ?? params.sessionCtx.GroupSubject?.trim();
-  const groupSpace = params.sessionCtx.GroupSpace?.trim();
+  const groupChannel = rawGroupChannel ? sanitizeForPromptLiteral(rawGroupChannel) : undefined;
+  const rawGroupSpace = params.sessionCtx.GroupSpace?.trim();
+  const groupSpace = rawGroupSpace ? sanitizeForPromptLiteral(rawGroupSpace) : undefined;
   const providerIdsLine = providerId
     ? (getChannelPlugin(providerId)?.groups?.resolveGroupIntroHint?.({
         cfg: params.cfg,
