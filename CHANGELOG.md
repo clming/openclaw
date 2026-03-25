@@ -65,6 +65,7 @@ Docs: https://docs.openclaw.ai
 - Telegram/outbound errors: preserve actionable 403 membership/block/kick details and treat `bot not a member` as a permanent delivery failure so Telegram sends stop retrying doomed chats. (#53635) Thanks @w-sss.
 - Telegram/photos: preflight Telegram photo dimension and aspect-ratio rules, and fall back to document sends when image metadata is invalid or unavailable so photo uploads stop failing with `PHOTO_INVALID_DIMENSIONS`. (#52545) Thanks @hnshah.
 - Slack/runtime defaults: trim Slack DM reply overhead, restore Codex auto transport, and tighten Slack/web-search runtime defaults around DM preview threading, cache scoping, warning dedupe, and explicit web-search opt-in. (#53957) Thanks @vincentkoc.
+- Agents/compaction: trigger timeout recovery compaction before retrying high-context LLM timeouts so embedded runs stop repeating oversized requests. (#46417) thanks @joeykrug.
 
 ## 2026.3.24-beta.2
 
@@ -424,6 +425,8 @@ Docs: https://docs.openclaw.ai
 - macOS/canvas actions: keep unattended local agent actions on trusted in-app canvas surfaces only, and stop exposing the deep-link fallback key to arbitrary page scripts. (#46790) Thanks @vincentkoc.
 - Agents/compaction: extend the enclosing run deadline once while compaction is actively in flight, and abort the underlying SDK compaction on timeout/cancel so large-session compactions stop freezing mid-run. (#46889) Thanks @asyncjason.
 - Gateway/Telegram shutdown: abort stalled Telegram polling fetches on shutdown, clean up per-cycle abort listeners, and keep the in-process watchdog ahead of supervisor stop timeouts so SIGTERM no longer leaves zombie gateways behind. (#51242) Thanks @juliabush.
+- Agents/openai-compatible tool calls: deduplicate repeated tool call ids across live assistant messages and replayed history so OpenAI-compatible backends no longer reject duplicate `tool_call_id` values with HTTP 400. (#40996) Thanks @xaeon2026.
+- Models/openai-completions: default non-native OpenAI-compatible providers to omit tool-definition `strict` fields unless users explicitly opt back in, so tool calling keeps working on providers that reject that option. (#45497) Thanks @sahancava.
 - Telegram/setup: warn when setup leaves DMs on pairing without an allowlist, and show valid account-scoped remediation commands. (#50710) Thanks @ernestodeoliveira.
 - Doctor/Telegram: replace the fresh-install empty group-allowlist false positive with first-run guidance that explains DM pairing approval and the next group setup steps, so new Telegram installs get actionable setup help instead of a broken-config warning. Thanks @vincentkoc.
 - Doctor/extensions: keep Matrix DM `allowFrom` repairs on the canonical `dm.allowFrom` path and stop treating Zalouser group sender gating as if it fell back to `allowFrom`, so doctor warnings and `--fix` stay aligned with runtime access control. Thanks @vincentkoc.
