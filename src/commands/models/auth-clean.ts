@@ -199,7 +199,7 @@ export async function modelsAuthCleanCommand(
           JSON.stringify(
             {
               warning:
-                "No profiles configured in openclaw.json auth.profiles or auth.order. All store profiles would be removed. Pass --force to proceed.",
+                "No profiles configured in openclaw.json auth.profiles or auth.order. All store profiles would be removed. Run without --dry-run to proceed.",
               storeProfiles: storeProfileIds,
               dryRun: true,
             },
@@ -313,6 +313,8 @@ export async function modelsAuthCleanCommand(
     agentLocalOnly: !isMainAgentDir,
     updater: (freshStore: AuthProfileStore) => {
       let mutated = false;
+      // Build a Set once for O(1) membership checks in the loops below.
+      const toRemoveSet = new Set(toRemove);
 
       // Remove stale profiles
       for (const id of toRemove) {
@@ -331,7 +333,7 @@ export async function modelsAuthCleanCommand(
         for (const provider of Object.keys(order)) {
           const existing = order[provider];
           if (Array.isArray(existing)) {
-            const filtered = existing.filter((id) => !toRemove.includes(id));
+            const filtered = existing.filter((id) => !toRemoveSet.has(id));
             if (filtered.length !== existing.length) {
               mutated = true;
               if (filtered.length > 0) {
@@ -360,7 +362,7 @@ export async function modelsAuthCleanCommand(
       // Prune removed ids from lastGood (provider -> profileId map)
       if (freshStore.lastGood) {
         for (const [provider, profileId] of Object.entries(freshStore.lastGood)) {
-          if (toRemove.includes(profileId)) {
+          if (toRemoveSet.has(profileId)) {
             delete freshStore.lastGood[provider];
             mutated = true;
           }
