@@ -88,7 +88,7 @@ export async function captureScreenshot(opts: {
       format,
       ...(quality !== undefined ? { quality } : {}),
       fromSurface: true,
-      captureBeyondViewport: true,
+      captureBeyondViewport: false,
       ...(clip ? { clip } : {}),
     })) as { data?: string };
 
