@@ -327,11 +327,17 @@ export async function getReplyFromConfig(
     perMessageQueueMode,
     perMessageQueueOptions,
   } = directiveResult.result;
+  let fallbackResetHooksEmitted = false;
   provider = resolvedProvider;
   model = resolvedModel;
 
   const maybeEmitMissingResetHooks = async () => {
-    if (!resetTriggered || !command.isAuthorizedSender || command.resetHookTriggered) {
+    if (
+      fallbackResetHooksEmitted ||
+      !resetTriggered ||
+      !command.isAuthorizedSender ||
+      command.resetHookTriggered
+    ) {
       return;
     }
     const resetMatch = command.commandBodyNormalized.match(/^\/(new|reset)(?:\s|$)/);
@@ -340,6 +346,7 @@ export async function getReplyFromConfig(
     }
     const { emitResetCommandHooks } = await import("./commands-core.runtime.js");
     const action: ResetCommandAction = resetMatch[1] === "reset" ? "reset" : "new";
+    fallbackResetHooksEmitted = true;
     await emitResetCommandHooks({
       action,
       ctx,
