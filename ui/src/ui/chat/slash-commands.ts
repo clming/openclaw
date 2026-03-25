@@ -66,6 +66,8 @@ const LOCAL_COMMANDS = new Set([
   "usage",
   "agents",
   "kill",
+  "steer",
+  "redirect",
 ]);
 
 const UI_ONLY_COMMANDS: SlashCommandDef[] = [
@@ -75,6 +77,15 @@ const UI_ONLY_COMMANDS: SlashCommandDef[] = [
     description: "Clear chat history",
     icon: "trash",
     category: "session",
+    executeLocal: true,
+  },
+  {
+    key: "redirect",
+    name: "redirect",
+    description: "Abort and restart with a new message",
+    args: "[id] <message>",
+    icon: "refresh",
+    category: "agents",
     executeLocal: true,
   },
 ];
