@@ -329,6 +329,7 @@ export function createPdfTool(options?: {
 
   const localRoots = resolveMediaToolLocalRoots(options?.workspaceDir, {
     workspaceOnly: options?.fsPolicy?.workspaceOnly === true,
+    roots: options?.fsPolicy?.roots,
   });
 
   const description =

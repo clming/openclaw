@@ -473,6 +473,7 @@ export function createImageGenerateTool(options?: {
     applyImageGenerationModelConfigDefaults(cfg, imageGenerationModelConfig) ?? cfg;
   const localRoots = resolveMediaToolLocalRoots(options?.workspaceDir, {
     workspaceOnly: options?.fsPolicy?.workspaceOnly === true,
+    roots: options?.fsPolicy?.roots,
   });
   const sandboxConfig =
     options?.sandbox && options.sandbox.root.trim()

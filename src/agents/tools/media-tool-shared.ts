@@ -1,5 +1,6 @@
 import { type Api, type Model } from "@mariozechner/pi-ai";
 import type { OpenClawConfig } from "../../config/config.js";
+import type { FsRoot } from "../../config/types.tools.js";
 import { getDefaultLocalRoots } from "../../media/web-media.js";
 import type { ImageModelConfig } from "./image-tool.helpers.js";
 import type { ToolModelConfig } from "./model-config.helpers.js";
@@ -54,8 +55,21 @@ function applyAgentDefaultModelConfig(
 
 export function resolveMediaToolLocalRoots(
   workspaceDirRaw: string | undefined,
-  options?: { workspaceOnly?: boolean },
+  options?: { workspaceOnly?: boolean; roots?: FsRoot[] },
 ): string[] {
+  // Roots take precedence — extract ALL root paths (dir and file) as allowed media roots.
+  // assertLocalMediaAllowed() in local-media-access.ts already supports both:
+  //   - dir roots via prefix matching: resolved.startsWith(resolvedRoot + path.sep)
+  //   - file roots via exact matching: resolved === resolvedRoot
+  // Both use realpath resolution, so symlink escapes are handled.
+  // Empty roots array is a valid deny-all policy — return empty to block all media reads.
+  // Note: kind="file" roots are passed as plain paths. assertLocalMediaAllowed uses
+  // realpath + prefix matching, so a misconfigured file root pointing to a directory
+  // would allow its subtree. The primary guard (validatePathAgainstRoots) enforces
+  // file-vs-dir semantics correctly; media roots are defense-in-depth.
+  if (options?.roots) {
+    return options.roots.map((r) => r.path);
+  }
   const workspaceDir = normalizeWorkspaceDir(workspaceDirRaw);
   if (options?.workspaceOnly) {
     return workspaceDir ? [workspaceDir] : [];

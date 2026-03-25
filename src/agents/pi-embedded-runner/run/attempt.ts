@@ -96,7 +96,7 @@ import {
 import { buildSystemPromptParams } from "../../system-prompt-params.js";
 import { buildSystemPromptReport } from "../../system-prompt-report.js";
 import { sanitizeToolCallIdsForCloudCodeAssist } from "../../tool-call-id.js";
-import { resolveEffectiveToolFsWorkspaceOnly } from "../../tool-fs-policy.js";
+import { resolveEffectiveToolFsWorkspaceOnly, resolveToolFsConfig } from "../../tool-fs-policy.js";
 import { normalizeToolName } from "../../tool-policy.js";
 import type { TranscriptPolicy } from "../../transcript-policy.js";
 import { resolveTranscriptPolicy } from "../../transcript-policy.js";
@@ -1765,6 +1765,10 @@ export async function runEmbeddedAttempt(
       config: params.config,
       sessionAgentId,
     });
+    const effectiveFsRoots = resolveToolFsConfig({
+      cfg: params.config,
+      agentId: sessionAgentId,
+    }).roots;
     // Track sessions_yield tool invocation (callback pattern, like clientToolCallDetected)
     let yieldDetected = false;
     let yieldMessage: string | null = null;
@@ -2828,6 +2832,7 @@ export async function runEmbeddedAttempt(
             maxBytes: MAX_IMAGE_BYTES,
             maxDimensionPx: resolveImageSanitizationLimits(params.config).maxDimensionPx,
             workspaceOnly: effectiveFsWorkspaceOnly,
+            roots: effectiveFsRoots,
             // Enforce sandbox path restrictions when sandbox is enabled
             sandbox:
               sandbox?.enabled && sandbox?.fsBridge
