@@ -2611,7 +2611,7 @@ export async function runEmbeddedAttempt(
       });
 
       const {
-        assistantTexts,
+        assistantTexts: rawAssistantTexts,
         toolMetas,
         unsubscribe,
         waitForCompactionRetry,
@@ -2625,6 +2625,7 @@ export async function runEmbeddedAttempt(
         getUsageTotals,
         getCompactionCount,
       } = subscription;
+      let assistantTexts = rawAssistantTexts;
 
       const queueHandle: EmbeddedPiQueueHandle = {
         queueMessage: async (text: string) => {
@@ -2859,9 +2860,10 @@ export async function runEmbeddedAttempt(
             );
           }
 
+          // Run llm_input hook — plugins may modify the user prompt
           if (hookRunner?.hasHooks("llm_input")) {
-            hookRunner
-              .runLlmInput(
+            try {
+              const llmInputResult = await hookRunner.runLlmInput(
                 {
                   runId: params.runId,
                   sessionId: params.sessionId,
@@ -2881,10 +2883,14 @@ export async function runEmbeddedAttempt(
                   trigger: params.trigger,
                   channelId: params.messageChannel ?? params.messageProvider ?? undefined,
                 },
-              )
-              .catch((err) => {
-                log.warn(`llm_input hook failed: ${String(err)}`);
-              });
+              );
+              // Apply any modifications from the hook
+              if (llmInputResult?.prompt) {
+                effectivePrompt = llmInputResult.prompt;
+              }
+            } catch (err) {
+              log.warn(`llm_input hook failed: ${String(err)}`);
+            }
           }
 
           const btwSnapshotMessages = activeSession.messages.slice(-MAX_BTW_SNAPSHOT_MESSAGES);
@@ -3152,9 +3158,10 @@ export async function runEmbeddedAttempt(
         )
         .map((entry) => ({ toolName: entry.toolName, meta: entry.meta }));
 
+      // Run llm_output hook — plugins may modify assistantTexts
       if (hookRunner?.hasHooks("llm_output")) {
-        hookRunner
-          .runLlmOutput(
+        try {
+          const llmOutputResult = await hookRunner.runLlmOutput(
             {
               runId: params.runId,
               sessionId: params.sessionId,
@@ -3173,10 +3180,14 @@ export async function runEmbeddedAttempt(
               trigger: params.trigger,
               channelId: params.messageChannel ?? params.messageProvider ?? undefined,
             },
-          )
-          .catch((err) => {
-            log.warn(`llm_output hook failed: ${String(err)}`);
-          });
+          );
+          // Apply any modifications from the hook
+          if (llmOutputResult?.assistantTexts) {
+            assistantTexts = llmOutputResult.assistantTexts;
+          }
+        } catch (err) {
+          log.warn(`llm_output hook failed: ${String(err)}`);
+        }
       }
 
       return {
