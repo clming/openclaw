@@ -330,9 +330,7 @@ export function buildAgentContext(
     agentFilesList && agentFilesList.agentId === agent.id ? agentFilesList.workspace : null;
   const workspace =
     workspaceFromFiles || config.entry?.workspace || config.defaults?.workspace || "default";
-  const modelLabel = config.entry?.model
-    ? resolveModelLabel(config.entry?.model)
-    : resolveModelLabel(config.defaults?.model);
+  const modelLabel = resolveEffectiveModelLabel(config.entry?.model, config.defaults?.model);
   const identityName =
     agentIdentity?.name?.trim() ||
     agent.identity?.name?.trim() ||
@@ -368,6 +366,16 @@ export function resolveModelLabel(model?: unknown): string {
     }
   }
   return "-";
+}
+
+export function resolveEffectiveModelLabel(entryModel?: unknown, defaultModel?: unknown): string {
+  const primary = resolveModelPrimary(entryModel) ?? resolveModelPrimary(defaultModel);
+  if (!primary) {
+    const entryLabel = resolveModelLabel(entryModel);
+    return entryLabel !== "-" ? entryLabel : resolveModelLabel(defaultModel);
+  }
+  const fallbacks = resolveEffectiveModelFallbacks(entryModel, defaultModel);
+  return fallbacks?.length ? `${primary} (+${fallbacks.length} fallback)` : primary;
 }
 
 export function normalizeModelValue(label: string): string {
@@ -424,6 +432,38 @@ export function resolveEffectiveModelFallbacks(
   defaultModel?: unknown,
 ): string[] | null {
   return resolveModelFallbacks(entryModel) ?? resolveModelFallbacks(defaultModel);
+}
+
+export function resolveModelConfigForFallbackEdit(params: {
+  existingModel?: unknown;
+  nextFallbacks: string[];
+  hadEffectiveFallbacks: boolean;
+}): string | { primary?: string; fallbacks?: string[] } | null {
+  const hasExplicitFallbacks =
+    !!params.existingModel &&
+    typeof params.existingModel === "object" &&
+    !Array.isArray(params.existingModel) &&
+    Array.isArray((params.existingModel as { fallbacks?: unknown }).fallbacks);
+  const explicitPrimary = (() => {
+    if (typeof params.existingModel === "string") {
+      const trimmed = params.existingModel.trim();
+      return trimmed || null;
+    }
+    return resolveModelPrimary(params.existingModel);
+  })();
+  const normalizedFallbacks = params.nextFallbacks.map((entry) => entry.trim()).filter(Boolean);
+
+  if (normalizedFallbacks.length > 0) {
+    return explicitPrimary
+      ? { primary: explicitPrimary, fallbacks: normalizedFallbacks }
+      : { fallbacks: normalizedFallbacks };
+  }
+
+  if (params.hadEffectiveFallbacks || hasExplicitFallbacks) {
+    return explicitPrimary ? { primary: explicitPrimary, fallbacks: [] } : { fallbacks: [] };
+  }
+
+  return explicitPrimary;
 }
 
 function addModelId(target: Set<string>, value: unknown) {
@@ -576,6 +616,7 @@ export function buildModelOptions(
   configForm: Record<string, unknown> | null,
   current?: string | null,
   catalog?: ModelCatalogEntry[],
+  selected?: string | null,
 ) {
   const seen = new Set<string>();
   const options: ConfiguredModelOption[] = [];
@@ -608,7 +649,12 @@ export function buildModelOptions(
   if (options.length === 0) {
     return nothing;
   }
-  return options.map((option) => html`<option value=${option.value}>${option.label}</option>`);
+  const selectedValue = selected ?? current ?? null;
+  return options.map(
+    (option) => html`<option value=${option.value} ?selected=${option.value === selectedValue}>
+      ${option.label}
+    </option>`,
+  );
 }
 
 type CompiledPattern =

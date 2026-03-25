@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import { ref } from "lit/directives/ref.js";
 import type {
   AgentIdentityResult,
   AgentsFilesListResult,
@@ -10,8 +11,8 @@ import {
   normalizeModelValue,
   parseFallbackList,
   resolveAgentConfig,
-  resolveModelFallbacks,
-  resolveModelLabel,
+  resolveEffectiveModelFallbacks,
+  resolveEffectiveModelLabel,
   resolveModelPrimary,
 } from "./agents-utils.ts";
 import type { AgentsPanel } from "./agents.ts";
@@ -53,20 +54,22 @@ export function renderAgentOverview(params: {
     agentFilesList && agentFilesList.agentId === agent.id ? agentFilesList.workspace : null;
   const workspace =
     workspaceFromFiles || config.entry?.workspace || config.defaults?.workspace || "default";
-  const model = config.entry?.model
-    ? resolveModelLabel(config.entry?.model)
-    : resolveModelLabel(config.defaults?.model);
-  const defaultModel = resolveModelLabel(config.defaults?.model);
+  const model = resolveEffectiveModelLabel(config.entry?.model, config.defaults?.model);
+  const defaultModel = resolveEffectiveModelLabel(undefined, config.defaults?.model);
   const entryPrimary = resolveModelPrimary(config.entry?.model);
   const defaultPrimary =
     resolveModelPrimary(config.defaults?.model) ||
     (defaultModel !== "-" ? normalizeModelValue(defaultModel) : null);
   const effectivePrimary = entryPrimary ?? defaultPrimary ?? null;
-  const modelFallbacks = resolveModelFallbacks(config.entry?.model);
-  const fallbackChips = modelFallbacks ?? [];
   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
   const skillCount = skillFilter?.length ?? null;
   const isDefault = Boolean(params.defaultId && agent.id === params.defaultId);
+  const selectedPrimary = isDefault ? (effectivePrimary ?? "") : (entryPrimary ?? "");
+  const modelFallbacks = resolveEffectiveModelFallbacks(
+    config.entry?.model,
+    config.defaults?.model,
+  );
+  const fallbackChips = modelFallbacks ?? [];
   const disabled = !configForm || configLoading || configSaving;
 
   const removeChip = (index: number) => {
@@ -127,7 +130,16 @@ export function renderAgentOverview(params: {
           <label class="field">
             <span>Primary model${isDefault ? " (default)" : ""}</span>
             <select
-              .value=${isDefault ? (effectivePrimary ?? "") : (entryPrimary ?? "")}
+              ${ref((el) => {
+                if (!(el instanceof HTMLSelectElement)) {
+                  return;
+                }
+                queueMicrotask(() => {
+                  if (el.isConnected && el.value !== selectedPrimary) {
+                    el.value = selectedPrimary;
+                  }
+                });
+              })}
               ?disabled=${disabled}
               @change=${(e: Event) =>
                 onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
@@ -135,15 +147,20 @@ export function renderAgentOverview(params: {
               ${
                 isDefault
                   ? html`
-                      <option value="">Not set</option>
+                      <option value="" ?selected=${selectedPrimary === ""}>Not set</option>
                     `
                   : html`
-                      <option value="">
+                      <option value="" ?selected=${selectedPrimary === ""}>
                         ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
                       </option>
                     `
               }
-              ${buildModelOptions(configForm, effectivePrimary ?? undefined, params.modelCatalog)}
+              ${buildModelOptions(
+                configForm,
+                effectivePrimary ?? undefined,
+                params.modelCatalog,
+                selectedPrimary,
+              )}
             </select>
           </label>
           <div class="field">
