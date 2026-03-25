@@ -1,5 +1,9 @@
 import { resolveQueueSettings } from "../auto-reply/reply/queue.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+import {
+  isSilentReplyText,
+  SILENT_REPLY_TOKEN,
+  stripSilentToken,
+} from "../auto-reply/tokens.js";
 import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import { loadConfig } from "../config/config.js";
 import {
@@ -337,6 +341,17 @@ function summarizeSubagentOutputHistory(messages: Array<unknown>): SubagentOutpu
         snapshot.latestAssistantText = undefined;
         snapshot.assistantFragments = [];
         continue;
+      }
+      // Strip trailing NO_REPLY from mixed-content text so reasoning noise
+      // preceding the token does not leak as visible subagent output.
+      if (text.includes(SILENT_REPLY_TOKEN)) {
+        const afterStrip = stripSilentToken(text, SILENT_REPLY_TOKEN);
+        if (!afterStrip.trim()) {
+          snapshot.latestSilentText = text;
+          snapshot.latestAssistantText = undefined;
+          snapshot.assistantFragments = [];
+          continue;
+        }
       }
       snapshot.latestSilentText = undefined;
       snapshot.latestAssistantText = text;
@@ -1503,7 +1518,10 @@ export async function runSubagentAnnounceFlow(params: {
       const fallbackReply = params.fallbackReply?.trim() ? params.fallbackReply.trim() : undefined;
       const fallbackIsSilent =
         Boolean(fallbackReply) &&
-        (isAnnounceSkip(fallbackReply) || isSilentReplyText(fallbackReply, SILENT_REPLY_TOKEN));
+        (isAnnounceSkip(fallbackReply) ||
+          isSilentReplyText(fallbackReply, SILENT_REPLY_TOKEN) ||
+          (fallbackReply!.includes(SILENT_REPLY_TOKEN) &&
+            !stripSilentToken(fallbackReply!, SILENT_REPLY_TOKEN).trim()));
 
       if (!reply) {
         reply = await readSubagentOutput(params.childSessionKey, outcome);
@@ -1543,7 +1561,12 @@ export async function runSubagentAnnounceFlow(params: {
         }
       }
 
-      if (isAnnounceSkip(reply) || isSilentReplyText(reply, SILENT_REPLY_TOKEN)) {
+      if (
+        isAnnounceSkip(reply) ||
+        isSilentReplyText(reply, SILENT_REPLY_TOKEN) ||
+        (reply?.includes(SILENT_REPLY_TOKEN) &&
+          !stripSilentToken(reply, SILENT_REPLY_TOKEN).trim())
+      ) {
         if (fallbackReply && !fallbackIsSilent) {
           reply = fallbackReply;
         } else {
