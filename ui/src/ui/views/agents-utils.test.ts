@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   agentLogoUrl,
   resolveConfiguredCronModelSuggestions,
@@ -102,12 +102,25 @@ describe("sortLocaleStrings", () => {
 });
 
 describe("agentLogoUrl", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("keeps base-mounted control UI logo paths absolute to the mount", () => {
     expect(agentLogoUrl("/ui")).toBe("/ui/favicon.svg");
     expect(agentLogoUrl("/apps/openclaw/")).toBe("/apps/openclaw/favicon.svg");
   });
 
-  it("uses a route-relative fallback before basePath bootstrap finishes", () => {
+  it("infers the mounted base path before bootstrap finishes", () => {
+    vi.stubGlobal("window", { location: { pathname: "/openclaw" } });
+    expect(agentLogoUrl("")).toBe("/openclaw/favicon.svg");
+
+    vi.stubGlobal("window", { location: { pathname: "/apps/openclaw/cron" } });
+    expect(agentLogoUrl("")).toBe("/apps/openclaw/favicon.svg");
+  });
+
+  it("uses a route-relative fallback when there is no mounted base path", () => {
+    vi.stubGlobal("window", { location: { pathname: "/chat" } });
     expect(agentLogoUrl("")).toBe("favicon.svg");
   });
 });
