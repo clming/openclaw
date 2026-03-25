@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   loadOpenClawPlugins: vi.fn(),
   loadPluginManifestRegistry: vi.fn(),
   getActivePluginRegistry: vi.fn(),
+  resolveConfiguredChannelPluginIds: vi.fn(() => []),
+  resolveChannelPluginIds: vi.fn(() => ["telegram", "slack"]),
 }));
 
 vi.mock("../agents/agent-scope.js", () => ({
@@ -20,6 +22,11 @@ vi.mock("../config/config.js", () => ({
 
 vi.mock("../plugins/loader.js", () => ({
   loadOpenClawPlugins: mocks.loadOpenClawPlugins,
+}));
+
+vi.mock("../plugins/channel-plugin-ids.js", () => ({
+  resolveConfiguredChannelPluginIds: mocks.resolveConfiguredChannelPluginIds,
+  resolveChannelPluginIds: mocks.resolveChannelPluginIds,
 }));
 
 vi.mock("../plugins/manifest-registry.js", () => ({
@@ -50,6 +57,8 @@ describe("ensurePluginRegistryLoaded", () => {
       channels: [],
       tools: [],
     });
+    mocks.resolveConfiguredChannelPluginIds.mockReturnValue([]);
+    mocks.resolveChannelPluginIds.mockReturnValue(["telegram", "slack"]);
   });
 
   it("loads only configured channel plugins for configured-channels scope", async () => {
@@ -59,7 +68,7 @@ describe("ensurePluginRegistryLoaded", () => {
 
     expect(mocks.loadOpenClawPlugins).toHaveBeenCalledWith(
       expect.objectContaining({
-        onlyPluginIds: ["telegram"],
+        onlyPluginIds: [],
         throwOnLoadError: true,
       }),
     );
@@ -86,7 +95,7 @@ describe("ensurePluginRegistryLoaded", () => {
     expect(mocks.loadOpenClawPlugins).toHaveBeenCalledTimes(2);
     expect(mocks.loadOpenClawPlugins).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ onlyPluginIds: ["telegram"], throwOnLoadError: true }),
+      expect.objectContaining({ onlyPluginIds: [], throwOnLoadError: true }),
     );
     expect(mocks.loadOpenClawPlugins).toHaveBeenNthCalledWith(
       2,
