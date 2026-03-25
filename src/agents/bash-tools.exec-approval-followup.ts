@@ -35,6 +35,7 @@ export async function sendExecApprovalFollowup(
 
   const channel = params.turnSourceChannel?.trim();
   const to = params.turnSourceTo?.trim();
+  const canRouteOutbound = Boolean(channel && to);
   const threadId =
     params.turnSourceThreadId != null && params.turnSourceThreadId !== ""
       ? String(params.turnSourceThreadId)
@@ -46,12 +47,12 @@ export async function sendExecApprovalFollowup(
     {
       sessionKey,
       message: buildExecApprovalFollowupPrompt(resultText),
-      deliver: true,
-      bestEffortDeliver: true,
-      channel: channel && to ? channel : undefined,
-      to: channel && to ? to : undefined,
-      accountId: channel && to ? params.turnSourceAccountId?.trim() || undefined : undefined,
-      threadId: channel && to ? threadId : undefined,
+      deliver: canRouteOutbound,
+      bestEffortDeliver: canRouteOutbound,
+      channel: canRouteOutbound ? channel : undefined,
+      to: canRouteOutbound ? to : undefined,
+      accountId: canRouteOutbound ? params.turnSourceAccountId?.trim() || undefined : undefined,
+      threadId: canRouteOutbound ? threadId : undefined,
       idempotencyKey: `exec-approval-followup:${params.approvalId}`,
     },
     { expectFinal: true },
