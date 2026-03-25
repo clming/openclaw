@@ -8,6 +8,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - MiniMax: add image generation provider for `image-01` model, supporting generate and image-to-image editing with aspect ratio control. (#54487) Thanks @liyuan97.
 - MiniMax: trim model catalog to M2.7 only, removing legacy M2, M2.1, M2.5, and VL-01 models. (#54487) Thanks @liyuan97.
 - Plugins/runtime: expose `runHeartbeatOnce` in the plugin runtime `system` namespace so plugins can trigger a single heartbeat cycle with an explicit delivery target override (e.g. `heartbeat: { target: "last" }`). (#40299) Thanks @loveyana.
@@ -28,6 +30,8 @@ Docs: https://docs.openclaw.ai
 ### Breaking
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Gateway/OpenAI compatibility: add `/v1/models` and `/v1/embeddings`, and forward explicit model overrides through `/v1/chat/completions` and `/v1/responses` for broader client and RAG compatibility. Thanks @vincentkoc.
 - Agents/tools: make `/tools` show the tools the current agent can actually use right now, add a compact default view with an optional detailed mode, and add a live "Available Right Now" section in the Control UI so it is easier to see what will work before you ask.
@@ -72,6 +76,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 ### Fixes
 
 - Outbound media/local files: align outbound media access with the configured fs policy so host-local files and inbound-media paths keep sending when `workspaceOnly` is off, while strict workspace-only agents remain sandboxed.
@@ -84,6 +90,8 @@ Docs: https://docs.openclaw.ai
 ### Breaking
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Gateway/OpenAI compatibility: add `/v1/models` and `/v1/embeddings`, and forward explicit model overrides through `/v1/chat/completions` and `/v1/responses` for broader client and RAG compatibility. Thanks @vincentkoc.
 - Agents/tools: make `/tools` show the tools the current agent can actually use right now, add a compact default view with an optional detailed mode, and add a live “Available Right Now” section in the Control UI so it is easier to see what will work before you ask.
@@ -150,6 +158,8 @@ Docs: https://docs.openclaw.ai
 ### Breaking
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - ModelStudio/Qwen: add standard (pay-as-you-go) DashScope endpoints for China and global Qwen API keys alongside the existing Coding Plan endpoints, and relabel the provider group to `Qwen (Alibaba Cloud Model Studio)`. (#43878)
 - UI/clarity: consolidate button primitives (`btn--icon`, `btn--ghost`, `btn--xs`), refine the Knot theme to a black-and-red palette with WCAG 2.1 AA contrast, add config icons for Diagnostics/CLI/Secrets/ACP/MCP sections, replace the roundness slider with discrete stops, and improve accessibility with aria-labels across usage filters. (#53272) Thanks @BunsDev.
@@ -231,6 +241,8 @@ Docs: https://docs.openclaw.ai
 - Gateway/usage: include reset and deleted archived session transcripts in usage totals, session discovery, and archived-only session detail fallback so the Usage view no longer undercounts rotated sessions. (#43215) Thanks @rcrick.
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - ClawHub/install: add native `openclaw skills search|install|update` flows plus `openclaw plugins install clawhub:<package>` with tracked update metadata, gateway skill-install/update support for ClawHub-backed requests, and regression coverage/docs for the new source path.
 - Plugins/marketplaces: add Claude marketplace registry resolution, `plugin@marketplace` installs, marketplace listing, and update support, plus Docker E2E coverage for local and official marketplace flows. (#48058) Thanks @vincentkoc.
@@ -542,6 +554,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Android/chat settings: redesign the chat settings sheet with grouped device and media sections, refresh the Connect and Voice tabs, and tighten the chat composer/session header for a denser mobile layout. (#44894) Thanks @obviyus.
 - iOS/onboarding: add a first-run welcome pager before gateway setup, stop auto-opening the QR scanner, and show `/pair qr` instructions on the connect step. (#45054) Thanks @ngutman.
 - Browser/existing-session: add an official Chrome DevTools MCP attach mode for signed-in live Chrome sessions, with docs for `chrome://inspect/#remote-debugging` enablement and direct backlinks to Chrome’s own setup guides.
@@ -623,6 +637,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.3.12
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Control UI/dashboard-v2: refresh the gateway dashboard with modular overview, chat, config, agent, and session views, plus a command palette, mobile bottom tabs, and richer chat tools like slash commands, search, export, and pinned messages. (#41503) Thanks @BunsDev.
 - OpenAI/GPT-5.4 fast mode: add configurable session-level fast toggles across `/fast`, TUI, Control UI, and ACP, with per-model config defaults and OpenAI/Codex request shaping.
@@ -722,6 +738,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.3.11
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - OpenRouter/models: add temporary Hunter Alpha and Healer Alpha entries to the built-in catalog so OpenRouter users can try the new free stealth models during their roughly one-week availability window. (#43642) Thanks @ping-Toven.
 - iOS/Home canvas: add a bundled welcome screen with a live agent overview that refreshes on connect, reconnect, and foreground return, and move the compact connection pill off the top-left canvas overlay. (#42456) Thanks @ngutman.
@@ -874,6 +892,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - CLI/backup: add `openclaw backup create` and `openclaw backup verify` for local state archives, including `--only-config`, `--no-include-workspace`, manifest/payload validation, and backup guidance in destructive flows. (#40163) thanks @shichangs.
 - macOS/onboarding: add a remote gateway token field for remote mode, preserve existing non-plaintext `gateway.remote.token` config values until explicitly replaced, and warn when the loaded token shape cannot be used directly from the macOS app. (#40187, supersedes #34614) Thanks @cgdusek.
 - Talk mode: add top-level `talk.silenceTimeoutMs` config so Talk waits a configurable amount of silence before auto-sending the current transcript, while keeping each platform's existing default pause window when unset. (#39607) Thanks @danodoesdesign. Fixes #17147.
@@ -952,6 +972,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.3.7
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Agents/context engine plugin interface: add `ContextEngine` plugin slot with full lifecycle hooks (`bootstrap`, `ingest`, `assemble`, `compact`, `afterTurn`, `prepareSubagentSpawn`, `onSubagentEnded`), slot-based registry with config-driven resolution, `LegacyContextEngine` wrapper preserving existing compaction behavior, scoped subagent runtime for plugin runtimes via `AsyncLocalStorage`, and `sessions.get` gateway method. Enables plugins like `lossless-claw` to provide alternative context management strategies without modifying core compaction logic. Zero behavior change when no context engine plugin is configured. (#22201) thanks @jalehman.
 - ACP/persistent channel bindings: add durable Discord channel and Telegram topic binding storage, routing resolution, and CLI/docs support so ACP thread targets survive restarts and can be managed consistently. (#34873) Thanks @dutifulbob.
@@ -1315,6 +1337,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Secrets/SecretRef coverage: expand SecretRef support across the full supported user-supplied credential surface (64 targets total), including runtime collectors, `openclaw secrets` planning/apply/audit flows, onboarding SecretInput UX, and related docs; unresolved refs now fail fast on active surfaces while inactive surfaces report non-blocking diagnostics. (#29580) Thanks @joshavant.
 - Tools/PDF analysis: add a first-class `pdf` tool with native Anthropic and Google PDF provider support, extraction fallback for non-native models, configurable defaults (`agents.defaults.pdfModel`, `pdfMaxBytesMb`, `pdfMaxPages`), and docs/tests covering routing, validation, and registration. (#31319) Thanks @tyler6204.
 - Outbound adapters/plugins: add shared `sendPayload` support across direct-text-media, Discord, Slack, WhatsApp, Zalo, and Zalouser with multi-media iteration and chunk-aware text fallback. (#30144) Thanks @nohat.
@@ -1536,6 +1560,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - OpenAI/Streaming transport: make `openai` Responses WebSocket-first by default (`transport: "auto"` with SSE fallback), add shared OpenAI WS stream/connection runtime wiring with per-session cleanup, and preserve server-side compaction payload mutation (`store` + `context_management`) on the WS path.
 - Gateway/Container probes: add built-in HTTP liveness/readiness endpoints (`/health`, `/healthz`, `/ready`, `/readyz`) for Docker/Kubernetes health checks, with fallback routing so existing handlers on those paths are not shadowed. (#31272) Thanks @vincentkoc.
 - Android/Nodes: add `camera.list`, `device.permissions`, `device.health`, and `notifications.actions` (`open`/`dismiss`/`reply`) on Android nodes, plus first-class node-tool actions for the new device/notification commands. (#28260) Thanks @obviyus.
@@ -1661,6 +1687,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.27
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Models/OpenAI forward compat: add support for `openai/gpt-5.4`, `openai/gpt-5.4-pro`, and `openai-codex/gpt-5.4`, including direct OpenAI Responses `serviceTier` passthrough safeguards for valid values. (#36590) Thanks @dorukardahan.
 - Android/Play package ID: rename the Android app package to `ai.openclaw.app`, including matching benchmark and Android tooling references for Play publishing. (#38712) Thanks @obviyus.
@@ -1823,6 +1851,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Highlight: External Secrets Management introduces a full `openclaw secrets` workflow (`audit`, `configure`, `apply`, `reload`) with runtime snapshot activation, strict `secrets apply` target-path validation, safer migration scrubbing, ref-only auth-profile support, and dedicated docs. (#26155) Thanks @joshavant.
 - ACP/Thread-bound agents: make ACP agents first-class runtimes for thread sessions with `acp` spawn/send dispatch integration, acpx backend bridging, lifecycle controls, startup reconciliation, runtime cleanup, and coalesced thread replies. (#23580) thanks @osolmaz.
 - Agents/Routing CLI: add `openclaw agents bindings`, `openclaw agents bind`, and `openclaw agents unbind` for account-scoped route management, including channel-only to account-scoped binding upgrades, role-aware binding identity handling, plugin-resolved binding account IDs, and optional account-binding prompts in `openclaw channels add`. (#27195) thanks @gumadeiras.
@@ -1924,6 +1954,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Android/Chat: improve streaming delivery handling and markdown rendering quality in the native Android chat UI, including better GitHub-flavored markdown behavior. (#26079) Thanks @obviyus.
 - Android/Startup perf: defer foreground-service startup, move WebView debugging init out of critical startup, and add startup macrobenchmark + low-noise perf CLI scripts for deterministic cold-start tracking. (#26659) Thanks @obviyus.
 - UI/Chat compose: add mobile stacked layout for compose action buttons on small screens to improve send/session controls usability. (#11167) Thanks @junyiz.
@@ -2003,6 +2035,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.24
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Auto-reply/Abort shortcuts: expand standalone stop phrases (`stop openclaw`, `stop action`, `stop run`, `stop agent`, `please stop`, and related variants), accept trailing punctuation (for example `STOP OPENCLAW!!!`), add multilingual stop keywords (including ES/FR/ZH/HI/AR/JP/DE/PT/RU forms), and treat exact `do not do that` as a stop trigger while preserving strict standalone matching. (#25103) Thanks @steipete and @vincentkoc.
 - Android/App UX: ship a native four-step onboarding flow, move post-onboarding into a five-tab shell (Connect, Chat, Voice, Screen, Settings), add a full Connect setup/manual mode screen, and refresh Android chat/settings surfaces for the new navigation model.
@@ -2098,6 +2132,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Providers/Kilo Gateway: add first-class `kilocode` provider support (auth, onboarding, implicit provider detection, model defaults, transcript/cache-ttl handling, and docs), with default model `kilocode/anthropic/claude-opus-4.6`. (#20212) Thanks @jrf0110 and @markijbema.
 - Providers/Vercel AI Gateway: accept Claude shorthand model refs (`vercel-ai-gateway/claude-*`) by normalizing to canonical Anthropic-routed model ids. (#23985) Thanks @sallyom, @markbooch, and @vincentkoc.
 - Docs/Prompt caching: add a dedicated prompt-caching reference covering `cacheRetention`, per-agent `params` merge precedence, Bedrock/OpenRouter behavior, and cache-ttl + heartbeat tuning. Thanks @svenssonaxel.
@@ -2160,6 +2196,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.22
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Control UI/Agents: make the Tools panel data-driven from runtime `tools.catalog`, add per-tool provenance labels (`core` / `plugin:<id>` + optional marker), and keep a static fallback list when the runtime catalog is unavailable.
 - Web Search/Gemini: add grounded Gemini provider support with provider auto-detection and config/docs updates. (#13075, #13074) Thanks @akoscz.
@@ -2419,6 +2457,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Models/Google: add Gemini 3.1 support (`google/gemini-3.1-pro-preview`).
 - Providers/Onboarding: add Volcano Engine (Doubao) and BytePlus providers/models (including coding variants), wire onboarding auth choices for interactive + non-interactive flows, and align docs to `volcengine-api-key`. (#7967) Thanks @funmore123.
 - Channels/CLI: add per-account/channel `defaultTo` outbound routing fallback so `openclaw agent --deliver` can send without explicit `--reply-to` when a default target is configured. (#16985) Thanks @KirillShchetinin.
@@ -2564,6 +2604,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - iOS/Watch: add an Apple Watch companion MVP with watch inbox UI, watch notification relay handling, and gateway command surfaces for watch status/send flows. (#20054) Thanks @mbelinky.
 - iOS/Gateway: wake disconnected iOS nodes via APNs before `nodes.invoke` and auto-reconnect gateway sessions on silent push wake to reduce invoke failures while the app is backgrounded. (#20332) Thanks @mbelinky.
 - Gateway/CLI: add paired-device hygiene flows with `device.pair.remove`, plus `openclaw devices remove` and guarded `openclaw devices clear --yes [--pending]` commands for removing paired entries and optionally rejecting pending requests. (#20057) Thanks @mbelinky.
@@ -2658,6 +2700,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.17
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Agents/Anthropic: add opt-in 1M context beta header support for Opus/Sonnet via model `params.context1m: true` (maps to `anthropic-beta: context-1m-2025-08-07`).
 - Agents/Models: support Anthropic Sonnet 4.6 (`anthropic/claude-sonnet-4-6`) across aliases/defaults with forward-compat fallback when upstream catalogs still only expose Sonnet 4.5.
@@ -2838,6 +2882,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Discord: unlock rich interactive agent prompts with Components v2 (buttons, selects, modals, and attachment-backed file blocks) so for native interaction through Discord. Thanks @thewilloftheshadow.
 - Discord: components v2 UI + embeds passthrough + exec approval UX refinements (CV2 containers, button layout, Discord-forwarding skip). Thanks @thewilloftheshadow.
 - Plugins: expose `llm_input` and `llm_output` hook payloads so extensions can observe prompt/input context and model output usage details. (#16724) Thanks @SecondThread.
@@ -2903,6 +2949,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.14
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Telegram: add poll sending via `openclaw message poll` (duration seconds, silent delivery, anonymity controls). (#16209) Thanks @robbyczgw-cla.
 - Slack/Discord: add `dmPolicy` + `allowFrom` config aliases for DM access control; legacy `dm.policy` + `dm.allowFrom` keys remain supported and `openclaw doctor --fix` can migrate them.
@@ -3053,6 +3101,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Install: add optional Podman-based setup: `setup-podman.sh` for one-time host setup (openclaw user, image, launch script, systemd quadlet), `run-openclaw-podman.sh launch` / `launch setup`; systemd Quadlet unit for openclaw user service; docs for rootless container, openclaw user (subuid/subgid), and quadlet (troubleshooting). (#16273) Thanks @DarwinsBuddy.
 - Discord: send voice messages with waveform previews from local audio files (including silent delivery). (#7253) Thanks @nyanjou.
 - Discord: add configurable presence status/activity/type/url (custom status defaults to activity text). (#10855) Thanks @h0tp-ftw.
@@ -3172,6 +3222,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.12
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - CLI/Plugins: add `openclaw plugins uninstall <id>` with `--dry-run`, `--force`, and `--keep-files` options, including safe uninstall path handling and plugin uninstall docs. (#5985) Thanks @JustasMonkev.
 - CLI: add `openclaw logs --local-time` to display log timestamps in local timezone. (#13818) Thanks @xialonglee.
@@ -3363,6 +3415,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Cron: default `wakeMode` is now `"now"` for new jobs (was `"next-heartbeat"`). (#10776) Thanks @tyler6204.
 - Cron: `cron run` defaults to force execution; use `--due` to restrict to due-only. (#10776) Thanks @tyler6204.
 - Models: support Anthropic Opus 4.6 and OpenAI Codex gpt-5.3-codex (forward-compat fallbacks). (#9853, #10720, #9995) Thanks @TinyTb, @calvin-hpnet, @tyler6204.
@@ -3394,6 +3448,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.3
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Telegram: remove last `@ts-nocheck` from `bot-handlers.ts`, use Grammy types directly, deduplicate `StickerMetadata`. Zero `@ts-nocheck` remaining in `src/telegram/`. (#9206)
 - Telegram: remove `@ts-nocheck` from `bot-message.ts`, type deps via `Omit<BuildTelegramMessageContextParams>`, widen `allMedia` to `TelegramMediaRef[]`. (#9180)
@@ -3455,6 +3511,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Docs: promote BlueBubbles as the recommended iMessage integration; mark imsg channel as legacy. (#8415) Thanks @tyler6204.
 
 ### Fixes
@@ -3470,6 +3528,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.2
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Feishu: add Feishu/Lark plugin support + docs. (#7313) Thanks @jiulingyun (openclaw-cn).
 - Web UI: add Agents dashboard for managing agent files, tools, skills, models, channels, and cron jobs.
@@ -3509,6 +3569,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.1
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Docs: onboarding/install/i18n/exec-approvals/Control UI/exe.dev/cacheRetention updates + misc nav/typos. (#3050, #3461, #4064, #4675, #4729, #4763, #5003, #5402, #5446, #5474, #5663, #5689, #5694, #5967, #6270, #6300, #6311, #6416, #6487, #6550, #6789)
 - Telegram: use shared pairing store. (#6127) Thanks @obviyus.
@@ -3576,6 +3638,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - CLI: add `completion` command (Zsh/Bash/PowerShell/Fish) and auto-setup during postinstall/onboarding.
 - CLI: add per-agent `models status` (`--agent` filter). (#4780) Thanks @jlowin.
 - Agents: add Kimi K2.5 to the synthetic model catalog. (#4407) Thanks @manikv12.
@@ -3611,6 +3675,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.1.29
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Rebrand: rename the npm package/CLI to `openclaw`, add a `openclaw` compatibility shim, and move extensions to the `@openclaw/*` scope.
 - Onboarding: strengthen security warning copy for beta + access control expectations.
@@ -3763,6 +3829,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Channels: add LINE plugin (Messaging API) with rich replies, quick replies, and plugin HTTP registry. (#1630) Thanks @plum-dawg.
 - TTS: add Edge TTS provider fallback, defaulting to keyless Edge with MP3 retry on format failures. (#1668) Thanks @steipete. https://docs.openclaw.ai/tts
 - TTS: add auto mode enum (off/always/inbound/tagged) with per-session `/tts` override. (#1667) Thanks @sebslight. https://docs.openclaw.ai/tts
@@ -3840,6 +3908,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Channels: allow per-group tool allow/deny policies across built-in + plugin channels. (#1546) Thanks @adam91holt. https://docs.openclaw.ai/multi-agent-sandbox-tools
 - Agents: add Bedrock auto-discovery defaults + config overrides. (#1553) Thanks @fal3. https://docs.openclaw.ai/bedrock
 - CLI: add `openclaw system` for system events + heartbeat controls; remove standalone `wake`. (commit 71203829d) https://docs.openclaw.ai/cli/system
@@ -3894,6 +3964,8 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Highlight: Compaction safeguard now uses adaptive chunking, progressive fallback, and UI status + retries. (#1466) Thanks @dlauer.
 - Providers: add Antigravity usage tracking to status output. (#1490) Thanks @patelhiren.
 - Slack: add chat-type reply threading overrides via `replyToModeByChatType`. (#1442) Thanks @stefangalescu.
@@ -3939,6 +4011,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.1.21
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Highlight: Lobster optional plugin tool for typed workflows + approval gates. https://docs.openclaw.ai/tools/lobster
 - Lobster: allow workflow file args via `argsJson` in the plugin tool. https://docs.openclaw.ai/tools/lobster
@@ -3991,6 +4065,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.1.20
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Control UI: add copy-as-markdown with error feedback. (#1345) https://docs.openclaw.ai/web/control-ui
 - Control UI: drop the legacy list view. (#1345) https://docs.openclaw.ai/web/control-ui
@@ -4175,6 +4251,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - CLI: stamp build commit into dist metadata so banners show the commit in npm installs.
 - CLI: close memory manager after memory commands to avoid hanging processes. (#1127) — thanks @NicholasSpisak.
 
@@ -4190,6 +4268,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 - Web search: add `country`/`language` parameters (schema + Brave API) and docs. (#1046) — thanks @YuriNachos. https://docs.openclaw.ai/tools/web
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Plugins: ship bundled plugins disabled by default and allow overrides by installed versions. (#1066) — thanks @ItzR3NO.
 - Plugins: add bundled Antigravity + Gemini CLI OAuth + Copilot Proxy provider plugins. (#1066) — thanks @ItzR3NO.
@@ -4300,6 +4380,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - UI/Apps: move channel/config settings to schema-driven forms and rename Connections → Channels. (#1040) — thanks @thewilloftheshadow.
 - CLI: set process titles to `openclaw-<command>` for clearer process listings.
 - CLI/macOS: sync remote SSH target/identity to config and let `gateway status` auto-infer SSH targets (ssh-config aware).
@@ -4386,6 +4468,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - Docs: clarify per-agent auth stores, sandboxed skill binaries, and elevated semantics.
 - Docs: add FAQ entries for missing provider auth after adding agents and Gemini thinking signature errors.
 - Agents: add optional auth-profile copy prompt on `agents add` and improve auth error messaging.
@@ -4424,6 +4508,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 ## 2026.1.14
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Usage: add MiniMax coding plan usage tracking.
 - Auth: label Claude Code CLI auth options. (#915) — thanks @SeanZoR.
@@ -4557,6 +4643,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 
 ### Changes
 
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
+
 - CLI/Onboarding: simplify MiniMax auth choice to a single M2.1 option.
 - CLI: configure section selection now loops until Continue.
 - Docs: explain MiniMax vs MiniMax Lightning (speed vs cost) and restore LM Studio example.
@@ -4648,6 +4736,8 @@ Thanks @AlexMikhalev, @CoreyH, @John-Rood, @KrauseFx, @MaudeBot, @Nachx639, @Nic
 - Gateway: add OpenAI-compatible `/v1/chat/completions` HTTP endpoint (auth, SSE streaming, per-agent routing). (#680).
 
 ### Changes
+
+- Agents: add compaction modes (`warn`, `error`, `none`) with a proactive context guard that stops execution before reaching the model's limit, preventing cryptic provider errors and preserving control during long-running sessions.
 
 - Onboarding/Models: add first-class Z.AI (GLM) auth choice (`zai-api-key`) + `--zai-api-key` flag.
 - CLI/Onboarding: add OpenRouter API key auth option in configure/onboard. (#703) — thanks @mteam88.
