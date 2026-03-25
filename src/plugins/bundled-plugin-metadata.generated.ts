@@ -2680,6 +2680,209 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
     },
   },
   {
+    dirName: "qqbot",
+    idHint: "qqbot",
+    source: {
+      source: "./index.ts",
+      built: "index.js",
+    },
+    setupSource: {
+      source: "./setup-entry.ts",
+      built: "setup-entry.js",
+    },
+    packageName: "@openclaw/qqbot",
+    packageVersion: "2026.3.22",
+    packageDescription: "OpenClaw QQ Bot channel plugin",
+    packageManifest: {
+      extensions: ["./index.ts"],
+      setupEntry: "./setup-entry.ts",
+      channel: {
+        id: "qqbot",
+        label: "QQ Bot",
+        selectionLabel: "QQ Bot (Official API)",
+        detailLabel: "QQ Bot",
+        docsPath: "/channels/qqbot",
+        docsLabel: "qqbot",
+        blurb: "connect to QQ via official QQ Bot API with group chat and direct message support.",
+        systemImage: "bubble.left.and.bubble.right",
+      },
+    },
+    manifest: {
+      id: "qqbot",
+      configSchema: {
+        type: "object",
+        additionalProperties: false,
+        $defs: {
+          audioFormatPolicy: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              sttDirectFormats: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              uploadDirectFormats: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              transcodeEnabled: {
+                type: "boolean",
+              },
+            },
+          },
+          secretRef: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              source: {
+                type: "string",
+                enum: ["env", "file", "exec"],
+              },
+              provider: {
+                type: "string",
+              },
+              id: {
+                type: "string",
+              },
+            },
+            required: ["source", "provider", "id"],
+          },
+          secretInput: {
+            anyOf: [
+              {
+                type: "string",
+                minLength: 1,
+              },
+              {
+                $ref: "#/$defs/secretRef",
+              },
+            ],
+          },
+          account: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              enabled: {
+                type: "boolean",
+              },
+              name: {
+                type: "string",
+              },
+              appId: {
+                type: "string",
+              },
+              clientSecret: {
+                $ref: "#/$defs/secretInput",
+              },
+              clientSecretFile: {
+                type: "string",
+              },
+              dmPolicy: {
+                type: "string",
+                enum: ["open", "pairing", "allowlist"],
+              },
+              allowFrom: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              systemPrompt: {
+                type: "string",
+              },
+              markdownSupport: {
+                type: "boolean",
+              },
+              voiceDirectUploadFormats: {
+                type: "array",
+                items: {
+                  type: "string",
+                },
+              },
+              audioFormatPolicy: {
+                $ref: "#/$defs/audioFormatPolicy",
+              },
+              urlDirectUpload: {
+                type: "boolean",
+              },
+              upgradeUrl: {
+                type: "string",
+              },
+              upgradeMode: {
+                type: "string",
+                enum: ["doc", "hot-reload"],
+              },
+            },
+          },
+        },
+        properties: {
+          enabled: {
+            type: "boolean",
+          },
+          name: {
+            type: "string",
+          },
+          appId: {
+            type: "string",
+          },
+          clientSecret: {
+            $ref: "#/$defs/secretInput",
+          },
+          clientSecretFile: {
+            type: "string",
+          },
+          dmPolicy: {
+            type: "string",
+            enum: ["open", "pairing", "allowlist"],
+          },
+          allowFrom: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+          },
+          systemPrompt: {
+            type: "string",
+          },
+          markdownSupport: {
+            type: "boolean",
+          },
+          voiceDirectUploadFormats: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+          },
+          audioFormatPolicy: {
+            $ref: "#/$defs/audioFormatPolicy",
+          },
+          urlDirectUpload: {
+            type: "boolean",
+          },
+          upgradeUrl: {
+            type: "string",
+          },
+          upgradeMode: {
+            type: "string",
+            enum: ["doc", "hot-reload"],
+          },
+          accounts: {
+            type: "object",
+            additionalProperties: {
+              $ref: "#/$defs/account",
+            },
+          },
+        },
+      },
+      channels: ["qqbot"],
+      skills: ["./skills"],
+    },
+  },
+  {
     dirName: "sglang",
     idHint: "sglang",
     source: {
